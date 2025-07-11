@@ -792,8 +792,7 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                                   try {
                                     const result = await apiService.videoSummarizer({
                                       space_key: selectedSpace,
-                                      page_title: page,
-                                      question: goal
+                                      page_title: page
                                     });
                                     const content = {
                                       summary: result.summary || 'No summary available',
