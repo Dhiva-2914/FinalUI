@@ -45,6 +45,7 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect, autoSpaceK
   const [error, setError] = useState('');
   // Add chat state
   const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'agent', text: string }[]>([]);
+  const [selectedFeature, setSelectedFeature] = useState<string | null>(null);
 
   // Load spaces on mount
   React.useEffect(() => {
@@ -583,99 +584,131 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                   <h3 className="text-xl font-bold text-gray-800 mb-4">Used Tools</h3>
                   {outputTabs.length > 0 ? (
                     <div className="space-y-6">
-                      {selectedPages.map(page => (
-                        <div key={page} className="bg-white/90 rounded-lg p-4 border border-orange-100">
-                          <h5 className="text-md font-bold mb-2 text-orange-700">Page: {page}</h5>
-                          <div className="space-y-4">
-                            {outputTabs.filter(tab => tab.page === page).map(tab => {
-                              const Icon = tab.icon;
-                              // Render by feature type
-                              if (tab.type === 'code') {
-                                return (
-                                  <div key={tab.id} className="mb-4">
-                                    <div className="flex items-center space-x-2 mb-2"><Icon className="w-4 h-4" /><span className="font-semibold">{tab.label}</span></div>
-                                    <div className="bg-gray-900/90 backdrop-blur-sm rounded-lg p-4 overflow-auto max-h-96 border border-white/10">
-                                      <pre className="text-sm text-gray-300"><code>{tab.content}</code></pre>
-                                    </div>
-                                  </div>
-                                );
-                              } else if (tab.type === 'diff') {
-                                return (
-                                  <div key={tab.id} className="mb-4">
-                                    <div className="flex items-center space-x-2 mb-2"><Icon className="w-4 h-4" /><span className="font-semibold">{tab.label}</span></div>
-                                    <div className="bg-gray-900/90 backdrop-blur-sm rounded-lg p-4 overflow-auto max-h-80 border border-white/10">
-                                      <pre className="text-sm">
-                                        <code>
-                                          {tab.content.split('\n').map((line, idx) => (
-                                            <div key={idx} className={
-                                              line.startsWith('+') ? 'text-green-400' :
-                                              line.startsWith('-') ? 'text-red-400' :
-                                              line.startsWith('@@') ? 'text-blue-400' :
-                                              'text-gray-300'}>{line}</div>
-                                          ))}
-                                        </code>
-                                      </pre>
-                                    </div>
-                                  </div>
-                                );
-                              } else if (tab.type === 'summary') {
-                                return (
-                                  <div key={tab.id} className="mb-4">
-                                    <div className="flex items-center space-x-2 mb-2"><Icon className="w-4 h-4" /><span className="font-semibold">{tab.label}</span></div>
-                                    <div className="bg-white/70 backdrop-blur-sm rounded-lg p-4 border border-white/20 prose prose-sm max-w-none">
-                                      {tab.content.split('\n').map((line, idx) => <p key={idx} className="text-gray-700 mb-1">{line}</p>)}
-                                    </div>
-                                  </div>
-                                );
-                              } else if (tab.type === 'video') {
-                                // Assume tab.content is an object with summary, quotes, timestamps
-                                const video = tab.content;
-                                return (
-                                  <div key={tab.id} className="mb-4">
-                                    <div className="flex items-center space-x-2 mb-2"><Icon className="w-4 h-4" /><span className="font-semibold">{tab.label}</span></div>
-                                    <div className="bg-white/70 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-                                      <h5 className="font-semibold text-gray-800 mb-3">AI Summary</h5>
-                                      <p className="text-gray-700 mb-2">{video.summary}</p>
-                                      {video.quotes && video.quotes.length > 0 && (
-                                        <div className="mb-2">
-                                          <h5 className="font-semibold text-gray-800 mb-1">Key Quotes</h5>
-                                          <ul className="list-disc ml-6">
-                                            {video.quotes.map((q, i) => <li key={i} className="italic text-gray-700">"{q}"</li>)}
-                                          </ul>
+                      {/* Feature Buttons */}
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        {Array.from(new Set(outputTabs.map(tab => tab.label))).map(featureLabel => (
+                          <button
+                            key={featureLabel}
+                            onClick={() => setSelectedFeature(selectedFeature === featureLabel ? null : featureLabel)}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${
+                              selectedFeature === featureLabel
+                                ? 'bg-orange-500 text-white border-orange-500'
+                                : 'bg-white/70 text-gray-700 border-gray-300 hover:bg-orange-50 hover:border-orange-300'
+                            }`}
+                          >
+                            {featureLabel}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Output Display */}
+                      {selectedFeature ? (
+                        <div className="space-y-6">
+                          {selectedPages.map(page => {
+                            const pageTabs = outputTabs.filter(tab => tab.page === page && tab.label === selectedFeature);
+                            if (pageTabs.length === 0) return null;
+                            
+                            return (
+                              <div key={page} className="bg-white/90 rounded-lg p-4 border border-orange-100">
+                                <h5 className="text-md font-bold mb-2 text-orange-700">Page: {page}</h5>
+                                <div className="space-y-4">
+                                  {pageTabs.map(tab => {
+                                    const Icon = tab.icon;
+                                    // Render by feature type
+                                    if (tab.type === 'code') {
+                                      return (
+                                        <div key={tab.id} className="mb-4">
+                                          <div className="flex items-center space-x-2 mb-2"><Icon className="w-4 h-4" /><span className="font-semibold">{tab.label}</span></div>
+                                          <div className="bg-gray-900/90 backdrop-blur-sm rounded-lg p-4 overflow-auto max-h-96 border border-white/10">
+                                            <pre className="text-sm text-gray-300"><code>{tab.content}</code></pre>
+                                          </div>
                                         </div>
-                                      )}
-                                      {video.timestamps && video.timestamps.length > 0 && (
-                                        <div className="mb-2">
-                                          <h5 className="font-semibold text-gray-800 mb-1">Timestamps</h5>
-                                          <ul className="list-disc ml-6">
-                                            {video.timestamps.map((t, i) => <li key={i} className="text-gray-700">{t}</li>)}
-                                          </ul>
+                                      );
+                                    } else if (tab.type === 'diff') {
+                                      return (
+                                        <div key={tab.id} className="mb-4">
+                                          <div className="flex items-center space-x-2 mb-2"><Icon className="w-4 h-4" /><span className="font-semibold">{tab.label}</span></div>
+                                          <div className="bg-gray-900/90 backdrop-blur-sm rounded-lg p-4 overflow-auto max-h-80 border border-white/10">
+                                            <pre className="text-sm">
+                                              <code>
+                                                {tab.content.split('\n').map((line, idx) => (
+                                                  <div key={idx} className={
+                                                    line.startsWith('+') ? 'text-green-400' :
+                                                    line.startsWith('-') ? 'text-red-400' :
+                                                    line.startsWith('@@') ? 'text-blue-400' :
+                                                    'text-gray-300'}>{line}</div>
+                                                ))}
+                                              </code>
+                                            </pre>
+                                          </div>
                                         </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              } else if (tab.type === 'image') {
-                                // Placeholder for image/chart rendering
-                                return (
-                                  <div key={tab.id} className="mb-4">
-                                    <div className="flex items-center space-x-2 mb-2"><Icon className="w-4 h-4" /><span className="font-semibold">{tab.label}</span></div>
-                                    <div className="bg-white/70 backdrop-blur-sm rounded-lg p-4 border border-white/20 text-gray-700">[Image analysis and chart would be shown here]</div>
-                                  </div>
-                                );
-                              } else {
-                                // Default: plain text
-                                return (
-                                  <div key={tab.id} className="mb-4">
-                                    <div className="flex items-center space-x-2 mb-2"><Icon className="w-4 h-4" /><span className="font-semibold">{tab.label}</span></div>
-                                    <div className="bg-white/70 backdrop-blur-sm rounded-lg p-4 border border-white/20 text-gray-700 whitespace-pre-line">{tab.content}</div>
-                                  </div>
-                                );
-                              }
-                            })}
-                          </div>
+                                      );
+                                    } else if (tab.type === 'summary') {
+                                      return (
+                                        <div key={tab.id} className="mb-4">
+                                          <div className="flex items-center space-x-2 mb-2"><Icon className="w-4 h-4" /><span className="font-semibold">{tab.label}</span></div>
+                                          <div className="bg-white/70 backdrop-blur-sm rounded-lg p-4 border border-white/20 prose prose-sm max-w-none">
+                                            {tab.content.split('\n').map((line, idx) => <p key={idx} className="text-gray-700 mb-1">{line}</p>)}
+                                          </div>
+                                        </div>
+                                      );
+                                    } else if (tab.type === 'video') {
+                                      // Assume tab.content is an object with summary, quotes, timestamps
+                                      const video = tab.content;
+                                      return (
+                                        <div key={tab.id} className="mb-4">
+                                          <div className="flex items-center space-x-2 mb-2"><Icon className="w-4 h-4" /><span className="font-semibold">{tab.label}</span></div>
+                                          <div className="bg-white/70 backdrop-blur-sm rounded-lg p-4 border border-white/20">
+                                            <h5 className="font-semibold text-gray-800 mb-3">AI Summary</h5>
+                                            <p className="text-gray-700 mb-2">{video.summary}</p>
+                                            {video.quotes && video.quotes.length > 0 && (
+                                              <div className="mb-2">
+                                                <h5 className="font-semibold text-gray-800 mb-1">Key Quotes</h5>
+                                                <ul className="list-disc ml-6">
+                                                  {video.quotes.map((q, i) => <li key={i} className="italic text-gray-700">"{q}"</li>)}
+                                                </ul>
+                                              </div>
+                                            )}
+                                            {video.timestamps && video.timestamps.length > 0 && (
+                                              <div className="mb-2">
+                                                <h5 className="font-semibold text-gray-800 mb-1">Timestamps</h5>
+                                                <ul className="list-disc ml-6">
+                                                  {video.timestamps.map((t, i) => <li key={i} className="text-gray-700">{t}</li>)}
+                                                </ul>
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      );
+                                    } else if (tab.type === 'image') {
+                                      // Placeholder for image/chart rendering
+                                      return (
+                                        <div key={tab.id} className="mb-4">
+                                          <div className="flex items-center space-x-2 mb-2"><Icon className="w-4 h-4" /><span className="font-semibold">{tab.label}</span></div>
+                                          <div className="bg-white/70 backdrop-blur-sm rounded-lg p-4 border border-white/20 text-gray-700">[Image analysis and chart would be shown here]</div>
+                                        </div>
+                                      );
+                                    } else {
+                                      // Default: plain text
+                                      return (
+                                        <div key={tab.id} className="mb-4">
+                                          <div className="flex items-center space-x-2 mb-2"><Icon className="w-4 h-4" /><span className="font-semibold">{tab.label}</span></div>
+                                          <div className="bg-white/70 backdrop-blur-sm rounded-lg p-4 border border-white/20 text-gray-700 whitespace-pre-line">{tab.content}</div>
+                                        </div>
+                                      );
+                                    }
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
-                      ))}
+                      ) : (
+                        <div className="text-center py-8 text-gray-500">
+                          <Zap className="w-12 h-12 mx-auto mb-2 text-gray-400" />
+                          <p>Click on a feature button above to view its outputs</p>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="text-center py-8 text-gray-500">
@@ -705,6 +738,7 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                       setGoal('');
                       setIsPlanning(true);
                       setOutputTabs([]);
+                      setSelectedFeature(null);
                       // Feature detection and execution for all features
                       const featuresToRun = [];
                       const lowerGoal = goal.toLowerCase();
