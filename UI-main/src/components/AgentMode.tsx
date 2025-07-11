@@ -989,7 +989,7 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
 };
 
 export default AgentMode;
-// Add this inside the AgentMode component, before the return statement
+// Move this block INSIDE the AgentMode component, before the main return
 if (selectedFeature === 'video') {
   return (
     <VideoSummarizer
