@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Zap, X, Send, Download, RotateCcw, FileText, Brain, CheckCircle, Loader2, MessageSquare, Plus, ChevronDown, Search, Video, Code, TrendingUp, TestTube, Image } from 'lucide-react';
 import type { AppMode } from '../App';
 import { apiService, Space } from '../services/api';
-import { useRef } from 'react';
 
 interface AgentModeProps {
   onClose: () => void;
@@ -42,16 +41,8 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect, autoSpaceK
   const [selectedPages, setSelectedPages] = useState<string[]>([]);
   const [selectAllPages, setSelectAllPages] = useState(false);
   const [error, setError] = useState('');
-
-  // State for chat
-  const [chatMessages, setChatMessages] = useState<{role: 'user'|'agent', text: string, tools?: OutputTab[]}[]>([]);
-  const [chatInput, setChatInput] = useState('');
-  const chatEndRef = useRef<HTMLDivElement>(null);
-
-  // Scroll to bottom on new message
-  React.useEffect(() => {
-    if (chatEndRef.current) chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
-  }, [chatMessages]);
+  // Add chat state
+  const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'agent', text: string }[]>([]);
 
   // Load spaces on mount
   React.useEffect(() => {
@@ -406,97 +397,6 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
     handleGoalSubmit();
   };
 
-  // Chat submit handler
-  const handleChatSubmit = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    const input = chatInput.trim();
-    if (!input) return;
-    setChatMessages(msgs => [...msgs, { role: 'user', text: input }]);
-    setChatInput('');
-
-    // Feature detection (same as before)
-    const featuresToRun = [];
-    const lowerGoal = input.toLowerCase();
-    if (/search|analyz|summariz|find|explor|context/.test(lowerGoal)) featuresToRun.push('search');
-    if (/code|convert|refactor|translate|language/.test(lowerGoal)) featuresToRun.push('code');
-    if (/video|summariz.*video|extract.*quote/.test(lowerGoal)) featuresToRun.push('video');
-    if (/impact|compare|diff|change|version/.test(lowerGoal)) featuresToRun.push('impact');
-    if (/test|strategy|cross-platform|sensitivity/.test(lowerGoal)) featuresToRun.push('test');
-    if (/image|chart|graph|visualiz/.test(lowerGoal)) featuresToRun.push('image');
-    if (featuresToRun.length === 0) featuresToRun.push('search');
-
-    // Run features and collect outputs
-    const results: OutputTab[] = [];
-    for (const feature of featuresToRun) {
-      let content = '';
-      let label = '';
-      let icon: any = FileText;
-      try {
-        if (feature === 'search') {
-          label = 'AI Powered Search';
-          icon = Search;
-          const result = await apiService.search({
-            space_key: selectedSpace,
-            page_titles: selectedPages,
-            query: input
-          });
-          content = result.response || 'No response.';
-        } else if (feature === 'code') {
-          label = 'Code Assistant';
-          icon = Code;
-          const page = selectedPages[0];
-          const result = await apiService.codeAssistant({
-            space_key: selectedSpace,
-            page_title: page,
-            instruction: input
-          });
-          content = result.summary + '\n\n' + (result.modified_code || result.original_code || '');
-        } else if (feature === 'video') {
-          label = 'Video Summarizer';
-          icon = Video;
-          const page = selectedPages[0];
-          const result = await apiService.videoSummarizer({
-            space_key: selectedSpace,
-            page_title: page,
-            question: input
-          });
-          content = result.summary + '\n\n' + (result.quotes ? result.quotes.map(q => `- ${q}`).join('\n') : '');
-        } else if (feature === 'impact') {
-          label = 'Impact Analyzer';
-          icon = TrendingUp;
-          const oldPage = selectedPages[0];
-          const newPage = selectedPages[1] || selectedPages[0];
-          const result = await apiService.impactAnalyzer({
-            space_key: selectedSpace,
-            old_page_title: oldPage,
-            new_page_title: newPage,
-            question: input
-          });
-          content = (result.impact_analysis || '') + '\n\n' + (result.diff || '');
-        } else if (feature === 'test') {
-          label = 'Test Support Tool';
-          icon = TestTube;
-          const codePage = selectedPages[0];
-          const result = await apiService.testSupport({
-            space_key: selectedSpace,
-            code_page_title: codePage,
-            question: input
-          });
-          content = (result.test_strategy || '') + '\n\n' + (result.cross_platform_testing || '') + '\n\n' + (result.sensitivity_analysis || '');
-        } else if (feature === 'image') {
-          label = 'Image Insights';
-          icon = Image;
-          const page = selectedPages[0];
-          content = 'Image analysis and chart generation would be shown here.';
-        }
-      } catch (err: any) {
-        content = 'Error: ' + (err.message || err.toString());
-      }
-      results.push({ id: feature, label, icon, content });
-    }
-    setChatMessages(msgs => [...msgs, { role: 'agent', text: '', tools: results }]);
-  };
-
   return (
     <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-40 p-4">
       <div className="bg-white/80 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden">
@@ -608,67 +508,222 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
           )}
 
           {/* The rest of Agent Mode UI (goal input, planning, execution, etc.) should only show after space/page selection is complete */}
-          {showSpacePageSelection && selectedSpace && selectedPages.length > 0 && (
+          {showSpacePageSelection && (
             <div className="max-w-4xl mx-auto">
-              <div className="bg-white/60 backdrop-blur-xl rounded-xl p-8 border border-white/20 shadow-lg">
-                <div className="mb-6">
-                  <h3 className="text-2xl font-bold text-gray-800 mb-2">Agent Chat</h3>
-                  <p className="text-gray-700 mb-4">Ask anything about the selected pages. The agent will use the right tools automatically.</p>
-                  <div className="h-96 overflow-y-auto bg-white/80 rounded-lg border border-white/10 p-4 mb-4" style={{ minHeight: 300 }}>
-                    {chatMessages.map((msg, idx) => (
-                      <div key={idx} className={`mb-4 ${msg.role === 'user' ? 'text-right' : 'text-left'}`}> 
-                        {msg.role === 'user' ? (
-                          <div className="inline-block bg-orange-100 text-orange-900 px-4 py-2 rounded-lg max-w-xl">{msg.text}</div>
-                        ) : (
-                          <div>
-                            {msg.tools && (
-                              <div className="mb-2">
-                                <div className="font-semibold text-gray-700 mb-1">Used Tools:</div>
-                                <div className="flex flex-wrap gap-2">
-                                  {msg.tools.map(tool => (
-                                    <button
-                                      key={tool.id}
-                                      onClick={() => setActiveTab(tool.id)}
-                                      className={`flex items-center space-x-2 px-3 py-1 rounded-lg border text-sm font-medium ${activeTab === tool.id ? 'bg-orange-500 text-white' : 'bg-white text-orange-700 border-orange-200 hover:bg-orange-100'}`}
-                                    >
-                                      <tool.icon className="w-4 h-4" />
-                                      <span>{tool.label}</span>
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                            {msg.tools && msg.tools.length > 0 && (
-                              <div className="mt-2 bg-white/90 border border-orange-100 rounded-lg p-4">
-                                {msg.tools.find(t => t.id === activeTab)?.content.split('\n').map((line, i) => (
-                                  <div key={i} className="text-gray-800 mb-1 whitespace-pre-line">{line}</div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
+              {/* Space/Page selection UI */}
+              <div className="bg-white/60 backdrop-blur-xl rounded-xl p-8 border border-white/20 shadow-lg text-center mb-8">
+                <h3 className="text-xl font-bold text-gray-800 mb-4">Select Space and Pages</h3>
+                {error && <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg">{error}</div>}
+                {/* Space Selection */}
+                <div className="mb-4 text-left">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Select Confluence Space</label>
+                  <div className="relative">
+                    <select
+                      value={selectedSpace}
+                      onChange={e => setSelectedSpace(e.target.value)}
+                      className="w-full p-3 border border-white/30 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 appearance-none bg-white/70 backdrop-blur-sm"
+                    >
+                      <option value="">Choose a space...</option>
+                      {spaces.map(space => (
+                        <option key={space.key} value={space.key}>{space.name} ({space.key})</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  </div>
+                </div>
+                {/* Page Selection */}
+                <div className="mb-4 text-left">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Select Pages to Analyze</label>
+                  <div className="space-y-2 max-h-40 overflow-y-auto border border-white/30 rounded-lg p-2 bg-white/50 backdrop-blur-sm">
+                    {pages.map(page => (
+                      <label key={page} className="flex items-center space-x-2 p-2 hover:bg-white/30 rounded cursor-pointer backdrop-blur-sm">
+                        <input
+                          type="checkbox"
+                          checked={selectedPages.includes(page)}
+                          onChange={e => {
+                            if (e.target.checked) {
+                              setSelectedPages([...selectedPages, page]);
+                            } else {
+                              setSelectedPages(selectedPages.filter(p => p !== page));
+                            }
+                          }}
+                          className="rounded border-gray-300 text-orange-500 focus:ring-orange-500"
+                        />
+                        <span className="text-sm text-gray-700">{page}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-sm text-gray-500 mt-1">{selectedPages.length} page(s) selected</p>
+                </div>
+                <div className="flex items-center space-x-2 mb-2">
+                  <input
+                    type="checkbox"
+                    checked={selectAllPages}
+                    onChange={toggleSelectAllPages}
+                    className="rounded border-gray-300 text-orange-500 focus:ring-orange-500"
+                  />
+                  <span className="text-sm text-gray-700 font-medium">Select All Pages</span>
+                </div>
+              </div>
+
+              {/* Chat area appears after at least one page is selected */}
+              {selectedSpace && selectedPages.length > 0 && (
+                <div className="bg-white/80 backdrop-blur-xl rounded-xl p-8 border border-white/20 shadow-lg">
+                  <h3 className="text-xl font-bold text-gray-800 mb-4">Agent Chat</h3>
+                  {/* Chat history */}
+                  <div className="mb-6 max-h-64 overflow-y-auto flex flex-col space-y-4">
+                    {chatHistory.map((msg, idx) => (
+                      <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`px-4 py-2 rounded-lg ${msg.role === 'user' ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-800'}`}>{msg.text}</div>
                       </div>
                     ))}
-                    <div ref={chatEndRef} />
                   </div>
-                  <form onSubmit={handleChatSubmit} className="flex gap-2">
-                    <input
-                      type="text"
-                      value={chatInput}
-                      onChange={e => setChatInput(e.target.value)}
-                      placeholder="Type your instruction..."
-                      className="flex-1 p-3 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white/70 backdrop-blur-sm"
+                  {/* Input area */}
+                  <form
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      if (!goal.trim()) return;
+                      setChatHistory([...chatHistory, { role: 'user', text: goal }]);
+                      setGoal('');
+                      setIsPlanning(true);
+                      setOutputTabs([]);
+                      // Feature detection and execution (same as before)
+                      const featuresToRun = [];
+                      const lowerGoal = goal.toLowerCase();
+                      if (/search|analyz|summariz|find|explor|context/.test(lowerGoal)) featuresToRun.push('search');
+                      if (/code|convert|refactor|translate|language/.test(lowerGoal)) featuresToRun.push('code');
+                      if (/video|summariz.*video|extract.*quote/.test(lowerGoal)) featuresToRun.push('video');
+                      if (/impact|compare|diff|change|version/.test(lowerGoal)) featuresToRun.push('impact');
+                      if (/test|strategy|cross-platform|sensitivity/.test(lowerGoal)) featuresToRun.push('test');
+                      if (/image|chart|graph|visualiz/.test(lowerGoal)) featuresToRun.push('image');
+                      if (featuresToRun.length === 0) featuresToRun.push('search');
+                      setTimeout(async () => {
+                        setIsPlanning(false);
+                        setIsExecuting(true);
+                        const results = [];
+                        for (const feature of featuresToRun) {
+                          let content = '';
+                          let label = '';
+                          let icon = FileText;
+                          try {
+                            if (feature === 'search') {
+                              label = 'AI Powered Search';
+                              icon = Search;
+                              const result = await apiService.search({
+                                space_key: selectedSpace,
+                                page_titles: selectedPages,
+                                query: goal
+                              });
+                              content = result.response || 'No response.';
+                            } else if (feature === 'code') {
+                              label = 'Code Assistant';
+                              icon = Code;
+                              const page = selectedPages[0];
+                              const result = await apiService.codeAssistant({
+                                space_key: selectedSpace,
+                                page_title: page,
+                                instruction: goal
+                              });
+                              content = result.summary + '\n\n' + (result.modified_code || result.original_code || '');
+                            } else if (feature === 'video') {
+                              label = 'Video Summarizer';
+                              icon = Video;
+                              const page = selectedPages[0];
+                              const result = await apiService.videoSummarizer({
+                                space_key: selectedSpace,
+                                page_title: page,
+                                question: goal
+                              });
+                              content = result.summary + '\n\n' + (result.quotes ? result.quotes.map(q => `- ${q}`).join('\n') : '');
+                            } else if (feature === 'impact') {
+                              label = 'Impact Analyzer';
+                              icon = TrendingUp;
+                              const oldPage = selectedPages[0];
+                              const newPage = selectedPages[1] || selectedPages[0];
+                              const result = await apiService.impactAnalyzer({
+                                space_key: selectedSpace,
+                                old_page_title: oldPage,
+                                new_page_title: newPage,
+                                question: goal
+                              });
+                              content = (result.impact_analysis || '') + '\n\n' + (result.diff || '');
+                            } else if (feature === 'test') {
+                              label = 'Test Support Tool';
+                              icon = TestTube;
+                              const codePage = selectedPages[0];
+                              const result = await apiService.testSupport({
+                                space_key: selectedSpace,
+                                code_page_title: codePage,
+                                question: goal
+                              });
+                              content = (result.test_strategy || '') + '\n\n' + (result.cross_platform_testing || '') + '\n\n' + (result.sensitivity_analysis || '');
+                            } else if (feature === 'image') {
+                              label = 'Image Insights';
+                              icon = Image;
+                              const page = selectedPages[0];
+                              content = 'Image analysis and chart generation would be shown here.';
+                            }
+                          } catch (err) {
+                            content = 'Error: ' + (err.message || err.toString());
+                          }
+                          results.push({ id: feature, label, icon, content });
+                        }
+                        setOutputTabs(results);
+                        setActiveTab(results[0]?.id || 'answer');
+                        setIsExecuting(false);
+                        setShowFollowUp(true);
+                        setChatHistory(prev => [...prev, { role: 'agent', text: results.map(r => r.label + ':\n' + r.content).join('\n\n') }]);
+                      }, 1500);
+                    }}
+                    className="flex items-center space-x-4"
+                  >
+                    <textarea
+                      value={goal}
+                      onChange={e => setGoal(e.target.value)}
+                      placeholder="Type your instruction or question..."
+                      className="flex-1 p-3 border border-orange-200/50 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 resize-none bg-white/70 backdrop-blur-sm text-lg"
+                      rows={2}
                     />
                     <button
                       type="submit"
-                      className="px-6 py-3 bg-orange-500/90 text-white rounded-lg hover:bg-orange-600 transition-colors font-semibold border border-white/10"
-                      disabled={!chatInput.trim()}
+                      disabled={!goal.trim()}
+                      className="bg-orange-500/90 backdrop-blur-sm text-white p-3 rounded-lg hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center space-x-2 transition-colors border border-white/10"
                     >
                       <Send className="w-5 h-5" />
                     </button>
                   </form>
+                  {/* Used Tools Section */}
+                  {outputTabs.length > 0 && (
+                    <div className="mt-8">
+                      <h4 className="text-lg font-semibold mb-2">Used Tools</h4>
+                      <div className="flex space-x-2 mb-4">
+                        {outputTabs.map(tab => {
+                          const Icon = tab.icon;
+                          return (
+                            <button
+                              key={tab.id}
+                              onClick={() => setActiveTab(tab.id)}
+                              className={`flex items-center space-x-2 px-4 py-2 rounded-lg border transition-colors whitespace-nowrap ${
+                                activeTab === tab.id
+                                  ? 'bg-orange-500 text-white border-orange-600'
+                                  : 'bg-white text-orange-600 border-orange-200 hover:bg-orange-100'
+                              }`}
+                            >
+                              <Icon className="w-4 h-4" />
+                              <span className="text-sm font-medium">{tab.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="bg-white/90 rounded-lg p-4 border border-orange-100 min-h-[80px]">
+                        {outputTabs.find(tab => tab.id === activeTab)?.content.split('\n').map((line, idx) => (
+                          <div key={idx} className="text-gray-800 mb-1 whitespace-pre-line">{line}</div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
             </div>
           )}
 
@@ -753,102 +808,4 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                                 activeTab === tab.id
                                   ? 'border-orange-500 text-orange-600 bg-white/50'
                                   : 'border-transparent text-gray-600 hover:text-gray-800 hover:bg-white/30'
-                              }`}
-                            >
-                              <Icon className="w-4 h-4" />
-                              <span className="text-sm font-medium">{tab.label}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Tab Content */}
-                    <div className="p-6">
-                      {outputTabs.find(tab => tab.id === activeTab) && (
-                        <div className="prose prose-sm max-w-none">
-                          {activeTab === 'qa' ? (
-                            <div>
-                              <div className="whitespace-pre-wrap text-gray-700 mb-4">
-                                {outputTabs.find(tab => tab.id === activeTab)?.content}
-                              </div>
-                              {showFollowUp && (
-                                <div className="border-t border-white/20 pt-4">
-                                  <div className="flex space-x-2">
-                                    <input
-                                      type="text"
-                                      value={followUpQuestion}
-                                      onChange={(e) => setFollowUpQuestion(e.target.value)}
-                                      placeholder="Ask a follow-up question..."
-                                      className="flex-1 p-3 border border-white/30 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white/70 backdrop-blur-sm"
-                                      onKeyPress={(e) => e.key === 'Enter' && handleFollowUp()}
-                                    />
-                                    <button
-                                      onClick={handleFollowUp}
-                                      disabled={!followUpQuestion.trim()}
-                                      className="px-4 py-3 bg-orange-500/90 backdrop-blur-sm text-white rounded-lg hover:bg-orange-600 disabled:bg-gray-300 transition-colors flex items-center border border-white/10"
-                                    >
-                                      <Plus className="w-4 h-4" />
-                                    </button>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="whitespace-pre-wrap text-gray-700">
-                              {outputTabs.find(tab => tab.id === activeTab)?.content.split('\n').map((line, index) => {
-                                if (line.startsWith('### ')) {
-                                  return <h3 key={index} className="text-lg font-bold text-gray-800 mt-4 mb-2">{line.substring(4)}</h3>;
-                                } else if (line.startsWith('## ')) {
-                                  return <h2 key={index} className="text-xl font-bold text-gray-800 mt-6 mb-3">{line.substring(3)}</h2>;
-                                } else if (line.startsWith('# ')) {
-                                  return <h1 key={index} className="text-2xl font-bold text-gray-800 mt-8 mb-4">{line.substring(2)}</h1>;
-                                } else if (line.startsWith('- **')) {
-                                  const match = line.match(/- \*\*(.*?)\*\*: (.*)/);
-                                  if (match) {
-                                    return <p key={index} className="mb-2"><strong>{match[1]}:</strong> {match[2]}</p>;
-                                  }
-                                } else if (line.startsWith('- ')) {
-                                  return <p key={index} className="mb-1 ml-4"> 2 {line.substring(2)}</p>;
-                                } else if (line.trim()) {
-                                  return <p key={index} className="mb-2 text-gray-700">{line}</p>;
-                                }
-                                return <br key={index} />;
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Actions */}
-          {planSteps.length > 0 && !isPlanning && !isExecuting && (
-            <div className="flex justify-end mt-8 space-x-4">
-              <button
-                onClick={exportPlan}
-                className="px-6 py-3 bg-orange-500/90 text-white rounded-lg hover:bg-orange-600 transition-colors font-semibold shadow-md border border-white/10"
-              >
-                <Download className="w-5 h-5 inline-block mr-2" />
-                Export Plan
-              </button>
-              <button
-                onClick={replaySteps}
-                className="px-6 py-3 bg-white/80 text-orange-600 rounded-lg hover:bg-orange-100 transition-colors font-semibold shadow-md border border-orange-200/50"
-              >
-                <RotateCcw className="w-5 h-5 inline-block mr-2" />
-                Replay Steps
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default AgentMode; 
+                              }`
