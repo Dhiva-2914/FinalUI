@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { Zap, X, Send, Download, RotateCcw, FileText, Brain, CheckCircle, Loader2, MessageSquare, Plus } from 'lucide-react';
+import React, { useState } from 'react';
+import { Zap, X, Send, Download, RotateCcw, FileText, Brain, CheckCircle, Loader2, MessageSquare, Plus, ChevronDown, Search, Video, Code, TrendingUp, TestTube, Image } from 'lucide-react';
 import type { AppMode } from '../App';
+import { apiService, Space } from '../services/api';
 
 interface AgentModeProps {
   onClose: () => void;
@@ -33,71 +34,172 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect, autoSpaceK
   const [followUpQuestion, setFollowUpQuestion] = useState('');
   const [showFollowUp, setShowFollowUp] = useState(false);
   const [outputTabs, setOutputTabs] = useState<OutputTab[]>([]);
+  const [showSpacePageSelection, setShowSpacePageSelection] = useState(false);
   const [selectedSpace, setSelectedSpace] = useState('');
-  const [selectedPages, setSelectedPages] = useState<string[]>([]);
-  const [spaces, setSpaces] = useState<any[]>([]);
+  const [spaces, setSpaces] = useState<Space[]>([]);
   const [pages, setPages] = useState<string[]>([]);
+  const [selectedPages, setSelectedPages] = useState<string[]>([]);
+  const [selectAllPages, setSelectAllPages] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    loadSpaces();
-  }, []);
+  // Load spaces on mount
+  React.useEffect(() => {
+    if (showSpacePageSelection) {
+      loadSpaces();
+    }
+  }, [showSpacePageSelection]);
 
-  useEffect(() => {
-    if (autoSpaceKey && isSpaceAutoConnected) {
+  // Auto-select space if provided
+  React.useEffect(() => {
+    if (autoSpaceKey && isSpaceAutoConnected && showSpacePageSelection) {
       setSelectedSpace(autoSpaceKey);
     }
-  }, [autoSpaceKey, isSpaceAutoConnected]);
+  }, [autoSpaceKey, isSpaceAutoConnected, showSpacePageSelection]);
 
-  useEffect(() => {
+  // Load pages when space is selected
+  React.useEffect(() => {
     if (selectedSpace) {
       loadPages();
+    } else {
+      setPages([]);
+      setSelectedPages([]);
     }
   }, [selectedSpace]);
+
+  // Sync select all checkbox
+  React.useEffect(() => {
+    setSelectAllPages(pages.length > 0 && selectedPages.length === pages.length);
+  }, [selectedPages, pages]);
 
   const loadSpaces = async () => {
     try {
       setError('');
-      // TODO: Replace with actual API call
-      // const result = await apiService.getSpaces();
-      // setSpaces(result.spaces);
+      const result = await apiService.getSpaces();
+      setSpaces(result.spaces);
     } catch (err) {
       setError('Failed to load spaces. Please check your backend connection.');
-      console.error('Error loading spaces:', err);
     }
   };
 
   const loadPages = async () => {
     try {
       setError('');
-      // TODO: Replace with actual API call
-      // const result = await apiService.getPages(selectedSpace);
-      // setPages(result.pages);
-      setSelectedPages([]); // Reset selected pages when space changes
+      const result = await apiService.getPages(selectedSpace);
+      setPages(result.pages);
     } catch (err) {
       setError('Failed to load pages. Please check your space key.');
-      console.error('Error loading pages:', err);
     }
+  };
+
+  const toggleSelectAllPages = () => {
+    if (selectAllPages) {
+      setSelectedPages([]);
+    } else {
+      setSelectedPages([...pages]);
+    }
+    setSelectAllPages(!selectAllPages);
   };
 
   const handleGoalSubmit = async () => {
     if (!goal.trim()) return;
-    
     setIsPlanning(true);
-    
-    // Simulate planning phase
-    setTimeout(() => {
-      const steps: PlanStep[] = [
-        { id: 1, title: 'Retrieve context', status: 'pending' },
-        { id: 2, title: 'Summarize', status: 'pending' },
-        { id: 3, title: 'Recommend changes', status: 'pending' }
-      ];
-      setPlanSteps(steps);
+    setPlanSteps([]);
+    setOutputTabs([]);
+
+    // Feature detection (simple keyword-based)
+    const featuresToRun = [];
+    const lowerGoal = goal.toLowerCase();
+    if (/search|analyz|summariz|find|explor|context/.test(lowerGoal)) featuresToRun.push('search');
+    if (/code|convert|refactor|translate|language/.test(lowerGoal)) featuresToRun.push('code');
+    if (/video|summariz.*video|extract.*quote/.test(lowerGoal)) featuresToRun.push('video');
+    if (/impact|compare|diff|change|version/.test(lowerGoal)) featuresToRun.push('impact');
+    if (/test|strategy|cross-platform|sensitivity/.test(lowerGoal)) featuresToRun.push('test');
+    if (/image|chart|graph|visualiz/.test(lowerGoal)) featuresToRun.push('image');
+    if (featuresToRun.length === 0) featuresToRun.push('search'); // fallback
+
+    // Simulate planning steps
+    setTimeout(async () => {
       setIsPlanning(false);
-      
-      // Start execution
-      executeSteps(steps);
-    }, 2000);
+      setIsExecuting(true);
+      const results: OutputTab[] = [];
+      for (const feature of featuresToRun) {
+        let content = '';
+        let label = '';
+        let icon: any = FileText;
+        try {
+          if (feature === 'search') {
+            label = 'AI Powered Search';
+            icon = Search;
+            const result = await apiService.search({
+              space_key: selectedSpace,
+              page_titles: selectedPages,
+              query: goal
+            });
+            content = result.response || 'No response.';
+          } else if (feature === 'code') {
+            label = 'Code Assistant';
+            icon = Code;
+            // Only use the first selected page for code
+            const page = selectedPages[0];
+            const result = await apiService.codeAssistant({
+              space_key: selectedSpace,
+              page_title: page,
+              instruction: goal
+            });
+            content = result.summary + '\n\n' + (result.modified_code || result.original_code || '');
+          } else if (feature === 'video') {
+            label = 'Video Summarizer';
+            icon = Video;
+            // Only use the first selected page for video
+            const page = selectedPages[0];
+            const result = await apiService.videoSummarizer({
+              space_key: selectedSpace,
+              page_title: page,
+              question: goal
+            });
+            content = result.summary + '\n\n' + (result.quotes ? result.quotes.map(q => `- ${q}`).join('\n') : '');
+          } else if (feature === 'impact') {
+            label = 'Impact Analyzer';
+            icon = TrendingUp;
+            // Use first two selected pages for old/new
+            const oldPage = selectedPages[0];
+            const newPage = selectedPages[1] || selectedPages[0];
+            const result = await apiService.impactAnalyzer({
+              space_key: selectedSpace,
+              old_page_title: oldPage,
+              new_page_title: newPage,
+              question: goal
+            });
+            content = (result.impact_analysis || '') + '\n\n' + (result.diff || '');
+          } else if (feature === 'test') {
+            label = 'Test Support Tool';
+            icon = TestTube;
+            // Only use the first selected page for code
+            const codePage = selectedPages[0];
+            const result = await apiService.testSupport({
+              space_key: selectedSpace,
+              code_page_title: codePage,
+              question: goal
+            });
+            content = (result.test_strategy || '') + '\n\n' + (result.cross_platform_testing || '') + '\n\n' + (result.sensitivity_analysis || '');
+          } else if (feature === 'image') {
+            label = 'Image Insights';
+            icon = Image;
+            // Only use the first selected page for image
+            const page = selectedPages[0];
+            // For demo, just show a placeholder (real implementation would need image URL)
+            content = 'Image analysis and chart generation would be shown here.';
+          }
+        } catch (err: any) {
+          content = 'Error: ' + (err.message || err.toString());
+        }
+        results.push({ id: feature, label, icon, content });
+      }
+      setOutputTabs(results);
+      setActiveTab(results[0]?.id || 'answer');
+      setIsExecuting(false);
+      setShowFollowUp(true);
+    }, 1500);
   };
 
   const executeSteps = async (steps: PlanStep[]) => {
@@ -321,8 +423,91 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
         </div>
 
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
-          {/* Goal Input Section */}
-          {!planSteps.length && !isPlanning && (
+          {/* Initial screen: Continue to Agent Mode button */}
+          {!showSpacePageSelection && (
+            <div className="flex flex-col items-center justify-center min-h-[300px]">
+              <h3 className="text-2xl font-bold text-gray-800 mb-6">Welcome to Agent Mode</h3>
+              <p className="text-gray-700 mb-8">Let the AI agent help you achieve your goals across Confluence spaces and pages.</p>
+              <button
+                onClick={() => setShowSpacePageSelection(true)}
+                className="px-8 py-4 bg-orange-500/90 text-white rounded-lg hover:bg-orange-600 transition-colors font-semibold shadow-md border border-white/10 text-lg flex items-center space-x-2"
+              >
+                <Zap className="w-6 h-6 mr-2" />
+                Continue to Agent Mode
+              </button>
+            </div>
+          )}
+
+          {/* Space/Page selection UI (mirrors Tool Mode) */}
+          {showSpacePageSelection && (!selectedSpace || selectedPages.length === 0) && (
+            <div className="mb-8 max-w-2xl mx-auto">
+              <div className="bg-white/60 backdrop-blur-xl rounded-xl p-8 border border-white/20 shadow-lg text-center mb-8">
+                <h3 className="text-xl font-bold text-gray-800 mb-4">Select Space and Pages</h3>
+                {error && <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg">{error}</div>}
+                {/* Space Selection */}
+                <div className="mb-4 text-left">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Select Confluence Space</label>
+                  <div className="relative">
+                    <select
+                      value={selectedSpace}
+                      onChange={e => setSelectedSpace(e.target.value)}
+                      className="w-full p-3 border border-white/30 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 appearance-none bg-white/70 backdrop-blur-sm"
+                    >
+                      <option value="">Choose a space...</option>
+                      {spaces.map(space => (
+                        <option key={space.key} value={space.key}>{space.name} ({space.key})</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  </div>
+                </div>
+                {/* Page Selection */}
+                <div className="mb-4 text-left">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Select Pages to Analyze</label>
+                  <div className="space-y-2 max-h-40 overflow-y-auto border border-white/30 rounded-lg p-2 bg-white/50 backdrop-blur-sm">
+                    {pages.map(page => (
+                      <label key={page} className="flex items-center space-x-2 p-2 hover:bg-white/30 rounded cursor-pointer backdrop-blur-sm">
+                        <input
+                          type="checkbox"
+                          checked={selectedPages.includes(page)}
+                          onChange={e => {
+                            if (e.target.checked) {
+                              setSelectedPages([...selectedPages, page]);
+                            } else {
+                              setSelectedPages(selectedPages.filter(p => p !== page));
+                            }
+                          }}
+                          className="rounded border-gray-300 text-orange-500 focus:ring-orange-500"
+                        />
+                        <span className="text-sm text-gray-700">{page}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-sm text-gray-500 mt-1">{selectedPages.length} page(s) selected</p>
+                </div>
+                <div className="flex items-center space-x-2 mb-2">
+                  <input
+                    type="checkbox"
+                    checked={selectAllPages}
+                    onChange={toggleSelectAllPages}
+                    className="rounded border-gray-300 text-orange-500 focus:ring-orange-500"
+                  />
+                  <span className="text-sm text-gray-700 font-medium">Select All Pages</span>
+                </div>
+                <button
+                  onClick={() => setError((!selectedSpace || selectedPages.length === 0) ? 'Please select a space and at least one page.' : '')}
+                  disabled={!selectedSpace || selectedPages.length === 0}
+                  className="mt-6 px-8 py-3 bg-orange-500/90 text-white rounded-lg hover:bg-orange-600 transition-colors font-semibold shadow-md border border-white/10 text-lg disabled:bg-gray-300 disabled:cursor-not-allowed"
+                >
+                  Continue
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* The rest of Agent Mode UI (goal input, planning, execution, etc.) should only show after space/page selection is complete */}
+          {showSpacePageSelection && selectedSpace && selectedPages.length > 0 && (
+            // Goal Input Section
             <div className="max-w-4xl mx-auto">
               <div className="bg-white/60 backdrop-blur-xl rounded-xl p-8 border border-white/20 shadow-lg text-center">
                 <h3 className="text-2xl font-bold text-gray-800 mb-6">What do you want the assistant to help you achieve?</h3>
