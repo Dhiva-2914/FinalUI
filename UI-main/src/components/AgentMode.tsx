@@ -21,7 +21,9 @@ interface OutputTab {
   id: string;
   label: string;
   icon: React.ComponentType<any>;
-  content: string;
+  content: any; // Can be string or object
+  page: string;
+  type: 'code' | 'diff' | 'summary' | 'video' | 'image' | 'text';
 }
 
 const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect, autoSpaceKey, isSpaceAutoConnected }) => {
@@ -138,6 +140,7 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect, autoSpaceK
               query: goal
             });
             content = result.response || 'No response.';
+            results.push({ id: feature, label, icon, content, page: selectedPages[0], type: 'text' });
           } else if (feature === 'code') {
             label = 'Code Assistant';
             icon = Code;
@@ -148,7 +151,8 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect, autoSpaceK
               page_title: page,
               instruction: goal
             });
-            content = result.summary + '\n\n' + (result.modified_code || result.original_code || '');
+            content = result.modified_code || result.original_code || '';
+            results.push({ id: feature, label, icon, content, page, type: 'code' });
           } else if (feature === 'video') {
             label = 'Video Summarizer';
             icon = Video;
@@ -159,7 +163,12 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect, autoSpaceK
               page_title: page,
               question: goal
             });
-            content = result.summary + '\n\n' + (result.quotes ? result.quotes.map(q => `- ${q}`).join('\n') : '');
+            content = {
+              summary: result.summary,
+              quotes: result.quotes || [],
+              timestamps: result.timestamps || []
+            };
+            results.push({ id: feature, label, icon, content, page, type: 'video' });
           } else if (feature === 'impact') {
             label = 'Impact Analyzer';
             icon = TrendingUp;
@@ -172,7 +181,8 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect, autoSpaceK
               new_page_title: newPage,
               question: goal
             });
-            content = (result.impact_analysis || '') + '\n\n' + (result.diff || '');
+            content = result.diff || '';
+            results.push({ id: feature, label, icon, content, page: oldPage, type: 'diff' });
           } else if (feature === 'test') {
             label = 'Test Support Tool';
             icon = TestTube;
@@ -183,19 +193,19 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect, autoSpaceK
               code_page_title: codePage,
               question: goal
             });
-            content = (result.test_strategy || '') + '\n\n' + (result.cross_platform_testing || '') + '\n\n' + (result.sensitivity_analysis || '');
+            content = result.test_strategy || '';
+            results.push({ id: feature, label, icon, content, page: codePage, type: 'summary' });
           } else if (feature === 'image') {
             label = 'Image Insights';
             icon = Image;
             // Only use the first selected page for image
             const page = selectedPages[0];
-            // For demo, just show a placeholder (real implementation would need image URL)
             content = 'Image analysis and chart generation would be shown here.';
+            results.push({ id: feature, label, icon, content, page, type: 'image' });
           }
         } catch (err: any) {
           content = 'Error: ' + (err.message || err.toString());
         }
-        results.push({ id: feature, label, icon, content });
       }
       setOutputTabs(results);
       setActiveTab(results[0]?.id || 'answer');
@@ -615,6 +625,7 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                                 query: goal
                               });
                               content = result.response || 'No response.';
+                              results.push({ id: feature, label, icon, content, page: selectedPages[0], type: 'text' });
                             } else if (feature === 'code') {
                               label = 'Code Assistant';
                               icon = Code;
@@ -624,7 +635,8 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                                 page_title: page,
                                 instruction: goal
                               });
-                              content = result.summary + '\n\n' + (result.modified_code || result.original_code || '');
+                              content = result.modified_code || result.original_code || '';
+                              results.push({ id: feature, label, icon, content, page, type: 'code' });
                             } else if (feature === 'video') {
                               label = 'Video Summarizer';
                               icon = Video;
@@ -634,7 +646,12 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                                 page_title: page,
                                 question: goal
                               });
-                              content = result.summary + '\n\n' + (result.quotes ? result.quotes.map(q => `- ${q}`).join('\n') : '');
+                              content = {
+                                summary: result.summary,
+                                quotes: result.quotes || [],
+                                timestamps: result.timestamps || []
+                              };
+                              results.push({ id: feature, label, icon, content, page, type: 'video' });
                             } else if (feature === 'impact') {
                               label = 'Impact Analyzer';
                               icon = TrendingUp;
@@ -646,7 +663,8 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                                 new_page_title: newPage,
                                 question: goal
                               });
-                              content = (result.impact_analysis || '') + '\n\n' + (result.diff || '');
+                              content = result.diff || '';
+                              results.push({ id: feature, label, icon, content, page: oldPage, type: 'diff' });
                             } else if (feature === 'test') {
                               label = 'Test Support Tool';
                               icon = TestTube;
@@ -656,22 +674,24 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                                 code_page_title: codePage,
                                 question: goal
                               });
-                              content = (result.test_strategy || '') + '\n\n' + (result.cross_platform_testing || '') + '\n\n' + (result.sensitivity_analysis || '');
+                              content = result.test_strategy || '';
+                              results.push({ id: feature, label, icon, content, page: codePage, type: 'summary' });
                             } else if (feature === 'image') {
                               label = 'Image Insights';
                               icon = Image;
                               const page = selectedPages[0];
                               content = 'Image analysis and chart generation would be shown here.';
+                              results.push({ id: feature, label, icon, content, page, type: 'image' });
                             }
                           } catch (err) {
                             content = 'Error: ' + (err.message || err.toString());
                           }
-                          results.push({ id: feature, label, icon, content });
                         }
                         setOutputTabs(results);
                         setActiveTab(results[0]?.id || 'answer');
                         setIsExecuting(false);
                         setShowFollowUp(true);
+                        setChatHistory(prev => [...prev, { role: 'agent', text: 'I have processed your request. Check the Used Tools section below for the results.' }]);
                       }, 1500);
                     }}
                     className="flex items-center space-x-4"
@@ -682,10 +702,10 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                       placeholder="Type your instruction or question..."
                       className="flex-1 p-3 border border-orange-200/50 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 resize-none bg-white/70 backdrop-blur-sm text-lg"
                       rows={2}
-                    />
-                    <button
+                  />
+                  <button
                       type="submit"
-                      disabled={!goal.trim()}
+                    disabled={!goal.trim()}
                       className="bg-orange-500/90 backdrop-blur-sm text-white p-3 rounded-lg hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center space-x-2 transition-colors border border-white/10"
                   >
                     <Send className="w-5 h-5" />
