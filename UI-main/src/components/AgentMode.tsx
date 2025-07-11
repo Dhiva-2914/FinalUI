@@ -989,18 +989,3 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
 };
 
 export default AgentMode;
-
-{
-  showVideoSummarizer && (
-    <VideoSummarizer
-      onClose={() => setShowVideoSummarizer(false)}
-      onFeatureSelect={setSelectedFeature}
-      autoSpaceKey={autoSpaceKey}
-      isSpaceAutoConnected={isSpaceAutoConnected}
-    />
-  )}
-</div>
-  );
-};
-
-export default AgentMode;
