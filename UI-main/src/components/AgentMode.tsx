@@ -770,11 +770,11 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                       // Feature detection and execution for all features
                       const featuresToRun = [];
                       const lowerGoal = goal.toLowerCase();
-                      if (/search|analyz|summariz|find|explor|context/.test(lowerGoal)) featuresToRun.push('search');
+                      if (/search|analyz|summariz|find|explor|context|ai.*powered|powered.*search/.test(lowerGoal)) featuresToRun.push('search');
                       if (/code|convert|refactor|translate|language/.test(lowerGoal)) featuresToRun.push('code');
-                      if (/video|summariz.*video|extract.*quote/.test(lowerGoal)) featuresToRun.push('video');
+                      if (/video|summariz.*video|extract.*quote|video.*summariz/.test(lowerGoal)) featuresToRun.push('video');
                       if (/impact|compare|diff|change|version/.test(lowerGoal)) featuresToRun.push('impact');
-                      if (/test|strategy|cross-platform|sensitivity/.test(lowerGoal)) featuresToRun.push('test');
+                      if (/test|strategy|cross-platform|sensitivity|test.*support|support.*tool/.test(lowerGoal)) featuresToRun.push('test');
                       if (/image|chart|graph|visualiz/.test(lowerGoal)) featuresToRun.push('image');
                       if (featuresToRun.length === 0) featuresToRun.push('search');
                       setTimeout(async () => {
@@ -787,7 +787,7 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                             let icon = FileText;
                             try {
                               if (feature === 'search') {
-                                label = 'AI Powered Search';
+                                label = 'AIPoweredSearch';
                                 icon = Search;
                                 // Run search for all selected pages at once
                                 const result = await apiService.search({
@@ -811,7 +811,7 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                                   results.push({ id: `${feature}-${page}`, label, icon, content, page: page.trim(), type: 'code' });
                                 }
                               } else if (feature === 'video') {
-                                label = 'Video Summarizer';
+                                label = 'VideoSummarizer';
                                 icon = Video;
                                 // Run video summarizer for each selected page
                                 for (const page of selectedPages) {
