@@ -426,88 +426,6 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
 
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
           {/* Initial screen: Continue to Agent Mode button */}
-          {!showSpacePageSelection && (
-            <div className="flex flex-col items-center justify-center min-h-[300px]">
-              <h3 className="text-2xl font-bold text-gray-800 mb-6">Welcome to Agent Mode</h3>
-              <p className="text-gray-700 mb-8">Let the AI agent help you achieve your goals across Confluence spaces and pages.</p>
-              <button
-                onClick={() => setShowSpacePageSelection(true)}
-                className="px-8 py-4 bg-orange-500/90 text-white rounded-lg hover:bg-orange-600 transition-colors font-semibold shadow-md border border-white/10 text-lg flex items-center space-x-2"
-              >
-                <Zap className="w-6 h-6 mr-2" />
-                Continue to Agent Mode
-              </button>
-            </div>
-          )}
-
-          {/* Space/Page selection UI (mirrors Tool Mode) */}
-          {showSpacePageSelection && (!selectedSpace || selectedPages.length === 0) && (
-            <div className="mb-8 max-w-2xl mx-auto">
-              <div className="bg-white/60 backdrop-blur-xl rounded-xl p-8 border border-white/20 shadow-lg text-center mb-8">
-                <h3 className="text-xl font-bold text-gray-800 mb-4">Select Space and Pages</h3>
-                {error && <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg">{error}</div>}
-                {/* Space Selection */}
-                <div className="mb-4 text-left">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Select Confluence Space</label>
-                  <div className="relative">
-                    <select
-                      value={selectedSpace}
-                      onChange={e => setSelectedSpace(e.target.value)}
-                      className="w-full p-3 border border-white/30 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 appearance-none bg-white/70 backdrop-blur-sm"
-                    >
-                      <option value="">Choose a space...</option>
-                      {spaces.map(space => (
-                        <option key={space.key} value={space.key}>{space.name} ({space.key})</option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  </div>
-                </div>
-                {/* Page Selection */}
-                <div className="mb-4 text-left">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Select Pages to Analyze</label>
-                  <div className="space-y-2 max-h-40 overflow-y-auto border border-white/30 rounded-lg p-2 bg-white/50 backdrop-blur-sm">
-                    {pages.map(page => (
-                      <label key={page} className="flex items-center space-x-2 p-2 hover:bg-white/30 rounded cursor-pointer backdrop-blur-sm">
-                        <input
-                          type="checkbox"
-                          checked={selectedPages.includes(page)}
-                          onChange={e => {
-                            if (e.target.checked) {
-                              setSelectedPages([...selectedPages, page]);
-                            } else {
-                              setSelectedPages(selectedPages.filter(p => p !== page));
-                            }
-                          }}
-                          className="rounded border-gray-300 text-orange-500 focus:ring-orange-500"
-                        />
-                        <span className="text-sm text-gray-700">{page}</span>
-                      </label>
-                    ))}
-                  </div>
-                  <p className="text-sm text-gray-500 mt-1">{selectedPages.length} page(s) selected</p>
-                </div>
-                <div className="flex items-center space-x-2 mb-2">
-                  <input
-                    type="checkbox"
-                    checked={selectAllPages}
-                    onChange={toggleSelectAllPages}
-                    className="rounded border-gray-300 text-orange-500 focus:ring-orange-500"
-                  />
-                  <span className="text-sm text-gray-700 font-medium">Select All Pages</span>
-                </div>
-                <button
-                  onClick={() => setError((!selectedSpace || selectedPages.length === 0) ? 'Please select a space and at least one page.' : '')}
-                  disabled={!selectedSpace || selectedPages.length === 0}
-                  className="mt-6 px-8 py-3 bg-orange-500/90 text-white rounded-lg hover:bg-orange-600 transition-colors font-semibold shadow-md border border-white/10 text-lg disabled:bg-gray-300 disabled:cursor-not-allowed"
-                >
-                  Continue
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* The rest of Agent Mode UI (goal input, planning, execution, etc.) should only show after space/page selection is complete */}
           {showSpacePageSelection && (
             <div className="max-w-4xl mx-auto">
               {/* Space/Page selection UI */}
@@ -688,9 +606,9 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                       type="submit"
                       disabled={!goal.trim()}
                       className="bg-orange-500/90 backdrop-blur-sm text-white p-3 rounded-lg hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center space-x-2 transition-colors border border-white/10"
-                    >
-                      <Send className="w-5 h-5" />
-                    </button>
+                  >
+                    <Send className="w-5 h-5" />
+                  </button>
                   </form>
                   {/* Used Tools Section */}
                   {outputTabs.length > 0 && (
@@ -816,12 +734,12 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                           );
                         })}
                       </div>
-                      {/* Tab Content */}
+                    {/* Tab Content */}
                       <div className="p-4">
                         {outputTabs.find(tab => tab.id === activeTab)?.content.split('\n').map((line, idx) => (
                           <div key={idx} className="text-gray-800 mb-1 whitespace-pre-line">{line}</div>
                         ))}
-                      </div>
+                        </div>
                     </div>
                   </div>
                 )}
@@ -834,4 +752,4 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
   );
 };
 
-export default AgentMode;
+export default AgentMode; 
