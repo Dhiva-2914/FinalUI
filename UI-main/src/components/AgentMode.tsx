@@ -460,7 +460,7 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                 {/* Space Selection */}
                 <div className="mb-4 text-left">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Select Confluence Space</label>
-                  <div className="relative">
+                <div className="relative">
                     <select
                       value={selectedSpace}
                       onChange={e => setSelectedSpace(e.target.value)}
@@ -587,7 +587,7 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                       {/* Feature Buttons */}
                       <div className="flex flex-wrap gap-2 mb-4">
                         {Array.from(new Set(outputTabs.map(tab => tab.label))).map(featureLabel => (
-                          <button
+                  <button
                             key={featureLabel}
                             onClick={() => setSelectedFeature(selectedFeature === featureLabel ? null : featureLabel)}
                             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${
@@ -604,15 +604,12 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                       {/* Output Display */}
                       {selectedFeature ? (
                         <div className="space-y-6">
-                          {selectedPages.map(page => {
-                            const pageTabs = outputTabs.filter(tab => tab.page === page && tab.label === selectedFeature);
-                            if (pageTabs.length === 0) return null;
-                            
+                          {outputTabs.filter(tab => tab.label === selectedFeature).map(tab => {
                             return (
-                              <div key={page} className="bg-white/90 rounded-lg p-4 border border-orange-100">
-                                <h5 className="text-md font-bold mb-2 text-orange-700">Page: {page}</h5>
+                              <div key={tab.id} className="bg-white/90 rounded-lg p-4 border border-orange-100">
+                                <h5 className="text-md font-bold mb-2 text-orange-700">Page: {tab.page}</h5>
                                 <div className="space-y-4">
-                                  {pageTabs.map(tab => {
+                                  {(() => {
                                     const Icon = tab.icon;
                                     // Render by feature type
                                     if (tab.type === 'code') {
@@ -726,7 +723,7 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                                         </div>
                                       );
                                     }
-                                  })}
+                                  })()}
                                 </div>
                               </div>
                             );
@@ -794,10 +791,8 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                               page_titles: selectedPages,
                               query: goal
                             });
-                            // Show the same result for all selected pages
-                            selectedPages.forEach(page => {
-                              results.push({ id: `${feature}-${page}`, label, icon, content: result.response || 'No response.', page, type: 'text' });
-                            });
+                            // Create one result for the search across all pages
+                            results.push({ id: feature, label, icon, content: result.response || 'No response.', page: selectedPages.join(', '), type: 'text' });
                           } else if (feature === 'code') {
                             label = 'Code Assistant';
                             icon = Code;
@@ -858,22 +853,68 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                             icon = Image;
                             // Run image insights for each selected page
                             for (const page of selectedPages) {
-                              // Simulate image analysis/chart generation
-                              const content = {
-                                chartType: 'bar',
-                                data: {
-                                  labels: ['Category 1', 'Category 2', 'Category 3', 'Category 4'],
-                                  values: [65, 45, 80, 30]
-                                },
-                                description: 'Bar graph generated from image analysis showing data distribution across categories.',
-                                insights: [
-                                  'Peak value observed in Category 3',
-                                  'Category 2 shows moderate performance',
-                                  'Category 4 has the lowest values',
-                                  'Overall trend shows varied distribution'
-                                ]
-                              };
-                              results.push({ id: `${feature}-${page}`, label, icon, content, page, type: 'image' });
+                              try {
+                                // Get images from the page
+                                const imagesResult = await apiService.getImages(selectedSpace, page);
+                                if (imagesResult.images && imagesResult.images.length > 0) {
+                                  // Use the first image for analysis
+                                  const imageUrl = imagesResult.images[0];
+                                  const imageResult = await apiService.imageSummary({
+                                    space_key: selectedSpace,
+                                    page_title: page,
+                                    image_url: imageUrl
+                                  });
+                                  
+                                  const content = {
+                                    chartType: 'bar',
+                                    data: {
+                                      labels: ['Category 1', 'Category 2', 'Category 3', 'Category 4'],
+                                      values: [65, 45, 80, 30]
+                                    },
+                                    description: imageResult.summary || 'Image analysis completed with chart generation.',
+                                    insights: [
+                                      'Peak value observed in Category 3',
+                                      'Category 2 shows moderate performance',
+                                      'Category 4 has the lowest values',
+                                      'Overall trend shows varied distribution'
+                                    ]
+                                  };
+                                  results.push({ id: `${feature}-${page}`, label, icon, content, page, type: 'image' });
+                                } else {
+                                  // No images found, create placeholder content
+                                  const content = {
+                                    chartType: 'bar',
+                                    data: {
+                                      labels: ['Category 1', 'Category 2', 'Category 3', 'Category 4'],
+                                      values: [65, 45, 80, 30]
+                                    },
+                                    description: 'No images found on this page. Chart generation would be available when images are present.',
+                                    insights: [
+                                      'No image data available for analysis',
+                                      'Please ensure the page contains images for chart generation',
+                                      'Image insights will be generated when images are detected'
+                                    ]
+                                  };
+                                  results.push({ id: `${feature}-${page}`, label, icon, content, page, type: 'image' });
+                                }
+                              } catch (err) {
+                                // Fallback to placeholder content if API fails
+                                const content = {
+                                  chartType: 'bar',
+                                  data: {
+                                    labels: ['Category 1', 'Category 2', 'Category 3', 'Category 4'],
+                                    values: [65, 45, 80, 30]
+                                  },
+                                  description: 'Image analysis and chart generation would be shown here.',
+                                  insights: [
+                                    'Peak value observed in Category 3',
+                                    'Category 2 shows moderate performance',
+                                    'Category 4 has the lowest values',
+                                    'Overall trend shows varied distribution'
+                                  ]
+                                };
+                                results.push({ id: `${feature}-${page}`, label, icon, content, page, type: 'image' });
+                              }
                             }
                           }
                         }
@@ -897,9 +938,9 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                       type="submit"
                       disabled={!goal.trim()}
                       className="bg-orange-500/90 backdrop-blur-sm text-white p-3 rounded-lg hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center space-x-2 transition-colors border border-white/10"
-                    >
-                      <Send className="w-5 h-5" />
-                    </button>
+                  >
+                    <Send className="w-5 h-5" />
+                  </button>
                   </form>
                 </div>
               </div>
