@@ -789,153 +789,118 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                           const results = [];
                           // Only run the single detected feature
                           const feature = featureToRun;
-                            let label = '';
-                            let icon = FileText;
-                            try {
-                              if (feature === 'code') {
-                                label = 'Code Assistant';
-                                icon = Code;
-                                // Run code assistant for each selected page
-                                for (const page of selectedPages) {
-                                  const result = await apiService.codeAssistant({
-                                    space_key: selectedSpace,
-                                    page_title: page,
-                                    instruction: goal
-                                  });
-                                  const content = result.modified_code || result.original_code || '';
-                                  results.push({ id: `${feature}-${page}`, label, icon, content, page: page.trim(), type: 'code' });
-                                }
-                              } else if (feature === 'video') {
-                                label = 'VideoSummarizer';
-                                icon = Video;
-                                // Run video summarizer for each selected page
-                                for (const page of selectedPages) {
-                                  try {
-                                    const result = await apiService.videoSummarizer({
-                                      space_key: selectedSpace,
-                                      page_title: page
-                                    });
-                                    const content = {
-                                      summary: result.summary || 'No summary available',
-                                      quotes: result.quotes || [],
-                                      timestamps: result.timestamps || []
-                                    };
-                                    results.push({ id: `${feature}-${page}`, label, icon, content, page: page.trim(), type: 'video' });
-                                  } catch (err) {
-                                    console.error('Video summarizer error:', err);
-                                    const content = {
-                                      summary: 'Error processing video content. Please check if the page contains video content.',
-                                      quotes: [],
-                                      timestamps: []
-                                    };
-                                    results.push({ id: `${feature}-${page}`, label, icon, content, page: page.trim(), type: 'video' });
-                                  }
-                                }
-                              } else if (feature === 'impact') {
-                                label = 'Impact Analyzer';
-                                icon = TrendingUp;
-                                // Use first two selected pages for old/new
-                                const oldPage = selectedPages[0];
-                                const newPage = selectedPages[1] || selectedPages[0];
-                                const result = await apiService.impactAnalyzer({
+                          let label = '';
+                          let icon = FileText;
+                          try {
+                            if (feature === 'code') {
+                              label = 'Code Assistant';
+                              icon = Code;
+                              // Run code assistant for each selected page
+                              for (const page of selectedPages) {
+                                const result = await apiService.codeAssistant({
                                   space_key: selectedSpace,
-                                  old_page_title: oldPage,
-                                  new_page_title: newPage,
+                                  page_title: page,
+                                  instruction: goal
+                                });
+                                const content = result.modified_code || result.original_code || '';
+                                results.push({ id: `${feature}-${page}`, label, icon, content, page: page.trim(), type: 'code' });
+                              }
+                            } else if (feature === 'video') {
+                              label = 'VideoSummarizer';
+                              icon = Video;
+                              // Run video summarizer for each selected page
+                              for (const page of selectedPages) {
+                                try {
+                                  const result = await apiService.videoSummarizer({
+                                    space_key: selectedSpace,
+                                    page_title: page
+                                  });
+                                  const content = {
+                                    summary: result.summary || 'No summary available',
+                                    quotes: result.quotes || [],
+                                    timestamps: result.timestamps || []
+                                  };
+                                  results.push({ id: `${feature}-${page}`, label, icon, content, page: page.trim(), type: 'video' });
+                                } catch (err) {
+                                  console.error('Video summarizer error:', err);
+                                  const content = {
+                                    summary: 'Error processing video content. Please check if the page contains video content.',
+                                    quotes: [],
+                                    timestamps: []
+                                  };
+                                  results.push({ id: `${feature}-${page}`, label, icon, content, page: page.trim(), type: 'video' });
+                                }
+                              }
+                            } else if (feature === 'impact') {
+                              label = 'Impact Analyzer';
+                              icon = TrendingUp;
+                              // Use first two selected pages for old/new
+                              const oldPage = selectedPages[0];
+                              const newPage = selectedPages[1] || selectedPages[0];
+                              const result = await apiService.impactAnalyzer({
+                                space_key: selectedSpace,
+                                old_page_title: oldPage,
+                                new_page_title: newPage,
+                                question: goal
+                              });
+                              results.push({ id: feature, label, icon, content: result.diff || '', page: oldPage.trim(), type: 'diff' });
+                            } else if (feature === 'test') {
+                              label = 'Test Support Tool';
+                              icon = TestTube;
+                              // Run test support for each selected page
+                              for (const page of selectedPages) {
+                                const result = await apiService.testSupport({
+                                  space_key: selectedSpace,
+                                  code_page_title: page,
                                   question: goal
                                 });
-                                results.push({ id: feature, label, icon, content: result.diff || '', page: oldPage.trim(), type: 'diff' });
-                              } else if (feature === 'test') {
-                                label = 'Test Support Tool';
-                                icon = TestTube;
-                                // Run test support for each selected page
-                                for (const page of selectedPages) {
-                                  const result = await apiService.testSupport({
-                                    space_key: selectedSpace,
-                                    code_page_title: page,
-                                    question: goal
-                                  });
-                                  results.push({ id: `${feature}-${page}`, label, icon, content: result.test_strategy || '', page: page.trim(), type: 'summary' });
-                                }
-                              } else if (feature === 'image') {
-                                label = 'Image Insights';
-                                icon = Image;
-                                // Run image insights for each selected page
-                                for (const page of selectedPages) {
-                                  try {
-                                    // Get images from the page
-                                    const imagesResult = await apiService.getImages(selectedSpace, page);
-                                    if (imagesResult.images && imagesResult.images.length > 0) {
-                                      // Use the first image for analysis
-                                      const imageUrl = imagesResult.images[0];
-                                      const imageResult = await apiService.imageSummary({
-                                        space_key: selectedSpace,
-                                        page_title: page,
-                                        image_url: imageUrl
-                                      });
-                                      
-                                      // Create actual chart using the chart API
-                                      const chartResult = await apiService.createChart({
-                                        space_key: selectedSpace,
-                                        page_title: page,
-                                        image_url: imageUrl,
-                                        chart_type: 'Grouped Bar',
-                                        filename: 'chart',
-                                        format: 'png'
-                                      });
-                                      
-                                      // Convert base64 to blob URL for display
-                                      const binaryString = atob(chartResult.chart_data);
-                                      const bytes = new Uint8Array(binaryString.length);
-                                      for (let i = 0; i < binaryString.length; i++) {
-                                        bytes[i] = binaryString.charCodeAt(i);
-                                      }
-                                      const blob = new Blob([bytes], { type: chartResult.mime_type });
-                                      const chartUrl = URL.createObjectURL(blob);
-                                      
-                                      const content = {
-                                        chartUrl: chartUrl,
-                                        summary: imageResult.summary || 'Image analysis completed with chart generation.',
-                                        chartType: 'bar',
-                                        data: {
-                                          labels: ['Category 1', 'Category 2', 'Category 3', 'Category 4'],
-                                          values: [65, 45, 80, 30]
-                                        },
-                                        description: imageResult.summary || 'Image analysis completed with chart generation.',
-                                        insights: [
-                                          'Peak value observed in Category 3',
-                                          'Category 2 shows moderate performance',
-                                          'Category 4 has the lowest values',
-                                          'Overall trend shows varied distribution'
-                                        ]
-                                      };
-                                      results.push({ id: `${feature}-${page}`, label, icon, content, page: page.trim(), type: 'image' });
-                                    } else {
-                                      // No images found, create placeholder content
-                                      const content = {
-                                        chartType: 'bar',
-                                        data: {
-                                          labels: ['Category 1', 'Category 2', 'Category 3', 'Category 4'],
-                                          values: [65, 45, 80, 30]
-                                        },
-                                        description: 'No images found on this page. Chart generation would be available when images are present.',
-                                        insights: [
-                                          'No image data available for analysis',
-                                          'Please ensure the page contains images for chart generation',
-                                          'Image insights will be generated when images are detected'
-                                        ]
-                                      };
-                                      results.push({ id: `${feature}-${page}`, label, icon, content, page: page.trim(), type: 'image' });
+                                results.push({ id: `${feature}-${page}`, label, icon, content: result.test_strategy || '', page: page.trim(), type: 'summary' });
+                              }
+                            } else if (feature === 'image') {
+                              label = 'Image Insights';
+                              icon = Image;
+                              // Run image insights for each selected page
+                              for (const page of selectedPages) {
+                                try {
+                                  // Get images from the page
+                                  const imagesResult = await apiService.getImages(selectedSpace, page);
+                                  if (imagesResult.images && imagesResult.images.length > 0) {
+                                    // Use the first image for analysis
+                                    const imageUrl = imagesResult.images[0];
+                                    const imageResult = await apiService.imageSummary({
+                                      space_key: selectedSpace,
+                                      page_title: page,
+                                      image_url: imageUrl
+                                    });
+                                    
+                                    // Create actual chart using the chart API
+                                    const chartResult = await apiService.createChart({
+                                      space_key: selectedSpace,
+                                      page_title: page,
+                                      image_url: imageUrl,
+                                      chart_type: 'Grouped Bar',
+                                      filename: 'chart',
+                                      format: 'png'
+                                    });
+                                    
+                                    // Convert base64 to blob URL for display
+                                    const binaryString = atob(chartResult.chart_data);
+                                    const bytes = new Uint8Array(binaryString.length);
+                                    for (let i = 0; i < binaryString.length; i++) {
+                                      bytes[i] = binaryString.charCodeAt(i);
                                     }
-                                  } catch (err) {
-                                    console.error('Image insights error:', err);
-                                    // Fallback to placeholder content if API fails
+                                    const blob = new Blob([bytes], { type: chartResult.mime_type });
+                                    const chartUrl = URL.createObjectURL(blob);
+                                    
                                     const content = {
+                                      chartUrl: chartUrl,
+                                      summary: imageResult.summary || 'Image analysis completed with chart generation.',
                                       chartType: 'bar',
                                       data: {
                                         labels: ['Category 1', 'Category 2', 'Category 3', 'Category 4'],
                                         values: [65, 45, 80, 30]
                                       },
-                                      description: 'Image analysis and chart generation would be shown here.',
+                                      description: imageResult.summary || 'Image analysis completed with chart generation.',
                                       insights: [
                                         'Peak value observed in Category 3',
                                         'Category 2 shows moderate performance',
@@ -944,21 +909,55 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                                       ]
                                     };
                                     results.push({ id: `${feature}-${page}`, label, icon, content, page: page.trim(), type: 'image' });
+                                  } else {
+                                    // No images found, create placeholder content
+                                    const content = {
+                                      chartType: 'bar',
+                                      data: {
+                                        labels: ['Category 1', 'Category 2', 'Category 3', 'Category 4'],
+                                        values: [65, 45, 80, 30]
+                                      },
+                                      description: 'No images found on this page. Chart generation would be available when images are present.',
+                                      insights: [
+                                        'No image data available for analysis',
+                                        'Please ensure the page contains images for chart generation',
+                                        'Image insights will be generated when images are detected'
+                                      ]
+                                    };
+                                    results.push({ id: `${feature}-${page}`, label, icon, content, page: page.trim(), type: 'image' });
                                   }
+                                } catch (err) {
+                                  console.error('Image insights error:', err);
+                                  // Fallback to placeholder content if API fails
+                                  const content = {
+                                    chartType: 'bar',
+                                    data: {
+                                      labels: ['Category 1', 'Category 2', 'Category 3', 'Category 4'],
+                                      values: [65, 45, 80, 30]
+                                    },
+                                    description: 'Image analysis and chart generation would be shown here.',
+                                    insights: [
+                                      'Peak value observed in Category 3',
+                                      'Category 2 shows moderate performance',
+                                      'Category 4 has the lowest values',
+                                      'Overall trend shows varied distribution'
+                                    ]
+                                  };
+                                  results.push({ id: `${feature}-${page}`, label, icon, content, page: page.trim(), type: 'image' });
                                 }
                               }
-                            } catch (err) {
-                              console.error(`Error processing feature ${feature}:`, err);
-                              // Add error result for this feature
-                              results.push({ 
-                                id: feature, 
-                                label: label || feature, 
-                                icon, 
-                                content: `Error processing ${feature}: ${err.message || 'Unknown error'}`, 
-                                page: selectedPages.join(', '), 
-                                type: 'text' 
-                              });
                             }
+                          } catch (err) {
+                            console.error(`Error processing feature ${feature}:`, err);
+                            // Add error result for this feature
+                            results.push({ 
+                              id: feature, 
+                              label: label || feature, 
+                              icon, 
+                              content: `Error processing ${feature}: ${err.message || 'Unknown error'}`, 
+                              page: selectedPages.join(', '), 
+                              type: 'text' 
+                            });
                           }
                           setOutputTabs(results);
                           // Automatically select the feature that was executed
