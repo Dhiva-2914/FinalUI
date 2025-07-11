@@ -607,7 +607,9 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                           {outputTabs.filter(tab => tab.label === selectedFeature).map(tab => {
                             return (
                               <div key={tab.id} className="bg-white/90 rounded-lg p-4 border border-orange-100">
-                                <h5 className="text-md font-bold mb-2 text-orange-700">Page: {tab.page}</h5>
+                                <h5 className="text-md font-bold mb-2 text-orange-700">
+                                  {tab.page.includes(',') ? `Pages: ${tab.page}` : `Page: ${tab.page}`}
+                                </h5>
                                 <div className="space-y-4">
                                   {(() => {
                                     const Icon = tab.icon;
@@ -792,7 +794,7 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                               query: goal
                             });
                             // Create one result for the search across all pages
-                            results.push({ id: feature, label, icon, content: result.response || 'No response.', page: selectedPages.join(', '), type: 'text' });
+                            results.push({ id: feature, label, icon, content: result.response || 'No response.', page: selectedPages.map(p => p.trim()).join(', '), type: 'text' });
                           } else if (feature === 'code') {
                             label = 'Code Assistant';
                             icon = Code;
@@ -804,7 +806,7 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                                 instruction: goal
                               });
                               const content = result.modified_code || result.original_code || '';
-                              results.push({ id: `${feature}-${page}`, label, icon, content, page, type: 'code' });
+                              results.push({ id: `${feature}-${page}`, label, icon, content, page: page.trim(), type: 'code' });
                             }
                           } else if (feature === 'video') {
                             label = 'Video Summarizer';
@@ -821,7 +823,7 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                                 quotes: result.quotes || [],
                                 timestamps: result.timestamps || []
                               };
-                              results.push({ id: `${feature}-${page}`, label, icon, content, page, type: 'video' });
+                              results.push({ id: `${feature}-${page}`, label, icon, content, page: page.trim(), type: 'video' });
                             }
                           } else if (feature === 'impact') {
                             label = 'Impact Analyzer';
@@ -835,7 +837,7 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                               new_page_title: newPage,
                               question: goal
                             });
-                            results.push({ id: feature, label, icon, content: result.diff || '', page: oldPage, type: 'diff' });
+                            results.push({ id: feature, label, icon, content: result.diff || '', page: oldPage.trim(), type: 'diff' });
                           } else if (feature === 'test') {
                             label = 'Test Support Tool';
                             icon = TestTube;
@@ -846,7 +848,7 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                                 code_page_title: page,
                                 question: goal
                               });
-                              results.push({ id: `${feature}-${page}`, label, icon, content: result.test_strategy || '', page, type: 'summary' });
+                              results.push({ id: `${feature}-${page}`, label, icon, content: result.test_strategy || '', page: page.trim(), type: 'summary' });
                             }
                           } else if (feature === 'image') {
                             label = 'Image Insights';
@@ -879,7 +881,7 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                                       'Overall trend shows varied distribution'
                                     ]
                                   };
-                                  results.push({ id: `${feature}-${page}`, label, icon, content, page, type: 'image' });
+                                  results.push({ id: `${feature}-${page}`, label, icon, content, page: page.trim(), type: 'image' });
                                 } else {
                                   // No images found, create placeholder content
                                   const content = {
@@ -895,7 +897,7 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                                       'Image insights will be generated when images are detected'
                                     ]
                                   };
-                                  results.push({ id: `${feature}-${page}`, label, icon, content, page, type: 'image' });
+                                  results.push({ id: `${feature}-${page}`, label, icon, content, page: page.trim(), type: 'image' });
                                 }
                               } catch (err) {
                                 // Fallback to placeholder content if API fails
@@ -913,7 +915,7 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                                     'Overall trend shows varied distribution'
                                   ]
                                 };
-                                results.push({ id: `${feature}-${page}`, label, icon, content, page, type: 'image' });
+                                results.push({ id: `${feature}-${page}`, label, icon, content, page: page.trim(), type: 'image' });
                               }
                             }
                           }
