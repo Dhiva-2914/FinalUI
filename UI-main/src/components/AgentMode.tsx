@@ -988,7 +988,7 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
   );
 };
 
-export default AgentMode; 
+export default AgentMode;
 
 {
   showVideoSummarizer && (
