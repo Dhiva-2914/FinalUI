@@ -782,80 +782,84 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                         setIsPlanning(false);
                         setIsExecuting(true);
                         const results = [];
-                        // Process each feature - only create one entry per feature
                         for (const feature of featuresToRun) {
-                          let content = '';
                           let label = '';
                           let icon = FileText;
-                          let page = selectedPages[0]; // Use first page for single feature processing
-                          
-                          try {
-                            if (feature === 'search') {
-                              label = 'AI Powered Search';
-                              icon = Search;
-                              const result = await apiService.search({
-                                space_key: selectedSpace,
-                                page_titles: selectedPages,
-                                query: goal
-                              });
-                              content = result.response || 'No response.';
-                              results.push({ id: feature, label, icon, content, page, type: 'text' });
-                            } else if (feature === 'code') {
-                              label = 'Code Assistant';
-                              icon = Code;
-                              // Only use the first selected page for code
+                          if (feature === 'search') {
+                            label = 'AI Powered Search';
+                            icon = Search;
+                            // Run search for all selected pages at once
+                            const result = await apiService.search({
+                              space_key: selectedSpace,
+                              page_titles: selectedPages,
+                              query: goal
+                            });
+                            // Show the same result for all selected pages
+                            selectedPages.forEach(page => {
+                              results.push({ id: `${feature}-${page}`, label, icon, content: result.response || 'No response.', page, type: 'text' });
+                            });
+                          } else if (feature === 'code') {
+                            label = 'Code Assistant';
+                            icon = Code;
+                            // Run code assistant for each selected page
+                            for (const page of selectedPages) {
                               const result = await apiService.codeAssistant({
                                 space_key: selectedSpace,
                                 page_title: page,
                                 instruction: goal
                               });
-                              content = result.modified_code || result.original_code || '';
-                              results.push({ id: feature, label, icon, content, page, type: 'code' });
-                            } else if (feature === 'video') {
-                              label = 'Video Summarizer';
-                              icon = Video;
-                              // Only use the first selected page for video
+                              const content = result.modified_code || result.original_code || '';
+                              results.push({ id: `${feature}-${page}`, label, icon, content, page, type: 'code' });
+                            }
+                          } else if (feature === 'video') {
+                            label = 'Video Summarizer';
+                            icon = Video;
+                            // Run video summarizer for each selected page
+                            for (const page of selectedPages) {
                               const result = await apiService.videoSummarizer({
                                 space_key: selectedSpace,
                                 page_title: page,
                                 question: goal
                               });
-                              content = {
+                              const content = {
                                 summary: result.summary,
                                 quotes: result.quotes || [],
                                 timestamps: result.timestamps || []
                               };
-                              results.push({ id: feature, label, icon, content, page, type: 'video' });
-                            } else if (feature === 'impact') {
-                              label = 'Impact Analyzer';
-                              icon = TrendingUp;
-                              // Use first two selected pages for old/new
-                              const oldPage = selectedPages[0];
-                              const newPage = selectedPages[1] || selectedPages[0];
-                              const result = await apiService.impactAnalyzer({
-                                space_key: selectedSpace,
-                                old_page_title: oldPage,
-                                new_page_title: newPage,
-                                question: goal
-                              });
-                              content = result.diff || '';
-                              results.push({ id: feature, label, icon, content, page: oldPage, type: 'diff' });
-                            } else if (feature === 'test') {
-                              label = 'Test Support Tool';
-                              icon = TestTube;
-                              // Only use the first selected page for code
+                              results.push({ id: `${feature}-${page}`, label, icon, content, page, type: 'video' });
+                            }
+                          } else if (feature === 'impact') {
+                            label = 'Impact Analyzer';
+                            icon = TrendingUp;
+                            // Use first two selected pages for old/new
+                            const oldPage = selectedPages[0];
+                            const newPage = selectedPages[1] || selectedPages[0];
+                            const result = await apiService.impactAnalyzer({
+                              space_key: selectedSpace,
+                              old_page_title: oldPage,
+                              new_page_title: newPage,
+                              question: goal
+                            });
+                            results.push({ id: feature, label, icon, content: result.diff || '', page: oldPage, type: 'diff' });
+                          } else if (feature === 'test') {
+                            label = 'Test Support Tool';
+                            icon = TestTube;
+                            // Run test support for each selected page
+                            for (const page of selectedPages) {
                               const result = await apiService.testSupport({
                                 space_key: selectedSpace,
                                 code_page_title: page,
                                 question: goal
                               });
-                              content = result.test_strategy || '';
-                              results.push({ id: feature, label, icon, content, page, type: 'summary' });
-                            } else if (feature === 'image') {
-                              label = 'Image Insights';
-                              icon = Image;
-                              // Create a more detailed image content
-                              content = {
+                              results.push({ id: `${feature}-${page}`, label, icon, content: result.test_strategy || '', page, type: 'summary' });
+                            }
+                          } else if (feature === 'image') {
+                            label = 'Image Insights';
+                            icon = Image;
+                            // Run image insights for each selected page
+                            for (const page of selectedPages) {
+                              // Simulate image analysis/chart generation
+                              const content = {
                                 chartType: 'bar',
                                 data: {
                                   labels: ['Category 1', 'Category 2', 'Category 3', 'Category 4'],
@@ -869,11 +873,8 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                                   'Overall trend shows varied distribution'
                                 ]
                               };
-                              results.push({ id: feature, label, icon, content, page, type: 'image' });
+                              results.push({ id: `${feature}-${page}`, label, icon, content, page, type: 'image' });
                             }
-                          } catch (err) {
-                            content = 'Error: ' + (err.message || err.toString());
-                            results.push({ id: feature, label, icon, content, page, type: 'text' });
                           }
                         }
                         setOutputTabs(results);
