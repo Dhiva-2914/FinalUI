@@ -672,7 +672,6 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                         setActiveTab(results[0]?.id || 'answer');
                         setIsExecuting(false);
                         setShowFollowUp(true);
-                        setChatHistory(prev => [...prev, { role: 'agent', text: results.map(r => r.label + ':\n' + r.content).join('\n\n') }]);
                       }, 1500);
                     }}
                     className="flex items-center space-x-4"
