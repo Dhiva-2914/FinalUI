@@ -808,4 +808,30 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                                 activeTab === tab.id
                                   ? 'border-orange-500 text-orange-600 bg-white/50'
                                   : 'border-transparent text-gray-600 hover:text-gray-800 hover:bg-white/30'
-                              }`
+                              }`}
+                            >
+                              <Icon className="w-4 h-4" />
+                              <span className="text-sm font-medium">{tab.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {/* Tab Content */}
+                      <div className="p-4">
+                        {outputTabs.find(tab => tab.id === activeTab)?.content.split('\n').map((line, idx) => (
+                          <div key={idx} className="text-gray-800 mb-1 whitespace-pre-line">{line}</div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default AgentMode;
