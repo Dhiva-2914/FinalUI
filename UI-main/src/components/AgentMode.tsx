@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Zap, X, Send, Download, RotateCcw, FileText, Brain, CheckCircle, Loader2, MessageSquare, Plus, ChevronDown, Search, Video, Code, TrendingUp, TestTube, Image } from 'lucide-react';
 import type { AppMode } from '../App';
 import { apiService, Space } from '../services/api';
+import { useRef } from 'react';
 
 interface AgentModeProps {
   onClose: () => void;
@@ -41,6 +42,16 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect, autoSpaceK
   const [selectedPages, setSelectedPages] = useState<string[]>([]);
   const [selectAllPages, setSelectAllPages] = useState(false);
   const [error, setError] = useState('');
+
+  // State for chat
+  const [chatMessages, setChatMessages] = useState<{role: 'user'|'agent', text: string, tools?: OutputTab[]}[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Scroll to bottom on new message
+  React.useEffect(() => {
+    if (chatEndRef.current) chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages]);
 
   // Load spaces on mount
   React.useEffect(() => {
@@ -395,6 +406,97 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
     handleGoalSubmit();
   };
 
+  // Chat submit handler
+  const handleChatSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const input = chatInput.trim();
+    if (!input) return;
+    setChatMessages(msgs => [...msgs, { role: 'user', text: input }]);
+    setChatInput('');
+
+    // Feature detection (same as before)
+    const featuresToRun = [];
+    const lowerGoal = input.toLowerCase();
+    if (/search|analyz|summariz|find|explor|context/.test(lowerGoal)) featuresToRun.push('search');
+    if (/code|convert|refactor|translate|language/.test(lowerGoal)) featuresToRun.push('code');
+    if (/video|summariz.*video|extract.*quote/.test(lowerGoal)) featuresToRun.push('video');
+    if (/impact|compare|diff|change|version/.test(lowerGoal)) featuresToRun.push('impact');
+    if (/test|strategy|cross-platform|sensitivity/.test(lowerGoal)) featuresToRun.push('test');
+    if (/image|chart|graph|visualiz/.test(lowerGoal)) featuresToRun.push('image');
+    if (featuresToRun.length === 0) featuresToRun.push('search');
+
+    // Run features and collect outputs
+    const results: OutputTab[] = [];
+    for (const feature of featuresToRun) {
+      let content = '';
+      let label = '';
+      let icon: any = FileText;
+      try {
+        if (feature === 'search') {
+          label = 'AI Powered Search';
+          icon = Search;
+          const result = await apiService.search({
+            space_key: selectedSpace,
+            page_titles: selectedPages,
+            query: input
+          });
+          content = result.response || 'No response.';
+        } else if (feature === 'code') {
+          label = 'Code Assistant';
+          icon = Code;
+          const page = selectedPages[0];
+          const result = await apiService.codeAssistant({
+            space_key: selectedSpace,
+            page_title: page,
+            instruction: input
+          });
+          content = result.summary + '\n\n' + (result.modified_code || result.original_code || '');
+        } else if (feature === 'video') {
+          label = 'Video Summarizer';
+          icon = Video;
+          const page = selectedPages[0];
+          const result = await apiService.videoSummarizer({
+            space_key: selectedSpace,
+            page_title: page,
+            question: input
+          });
+          content = result.summary + '\n\n' + (result.quotes ? result.quotes.map(q => `- ${q}`).join('\n') : '');
+        } else if (feature === 'impact') {
+          label = 'Impact Analyzer';
+          icon = TrendingUp;
+          const oldPage = selectedPages[0];
+          const newPage = selectedPages[1] || selectedPages[0];
+          const result = await apiService.impactAnalyzer({
+            space_key: selectedSpace,
+            old_page_title: oldPage,
+            new_page_title: newPage,
+            question: input
+          });
+          content = (result.impact_analysis || '') + '\n\n' + (result.diff || '');
+        } else if (feature === 'test') {
+          label = 'Test Support Tool';
+          icon = TestTube;
+          const codePage = selectedPages[0];
+          const result = await apiService.testSupport({
+            space_key: selectedSpace,
+            code_page_title: codePage,
+            question: input
+          });
+          content = (result.test_strategy || '') + '\n\n' + (result.cross_platform_testing || '') + '\n\n' + (result.sensitivity_analysis || '');
+        } else if (feature === 'image') {
+          label = 'Image Insights';
+          icon = Image;
+          const page = selectedPages[0];
+          content = 'Image analysis and chart generation would be shown here.';
+        }
+      } catch (err: any) {
+        content = 'Error: ' + (err.message || err.toString());
+      }
+      results.push({ id: feature, label, icon, content });
+    }
+    setChatMessages(msgs => [...msgs, { role: 'agent', text: '', tools: results }]);
+  };
+
   return (
     <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-40 p-4">
       <div className="bg-white/80 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden">
@@ -507,25 +609,64 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
 
           {/* The rest of Agent Mode UI (goal input, planning, execution, etc.) should only show after space/page selection is complete */}
           {showSpacePageSelection && selectedSpace && selectedPages.length > 0 && (
-            // Goal Input Section
             <div className="max-w-4xl mx-auto">
-              <div className="bg-white/60 backdrop-blur-xl rounded-xl p-8 border border-white/20 shadow-lg text-center">
-                <h3 className="text-2xl font-bold text-gray-800 mb-6">What do you want the assistant to help you achieve?</h3>
-                <div className="relative">
-                  <textarea
-                    value={goal}
-                    onChange={(e) => setGoal(e.target.value)}
-                    placeholder="Describe your goal in detail... (e.g., 'Help me analyze our documentation structure and recommend improvements for better user experience')"
-                    className="w-full p-4 border-2 border-orange-200/50 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 resize-none bg-white/70 backdrop-blur-sm text-lg"
-                    rows={4}
-                  />
-                  <button
-                    onClick={handleGoalSubmit}
-                    disabled={!goal.trim()}
-                    className="absolute bottom-4 right-4 bg-orange-500/90 backdrop-blur-sm text-white p-3 rounded-lg hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center space-x-2 transition-colors border border-white/10"
-                  >
-                    <Send className="w-5 h-5" />
-                  </button>
+              <div className="bg-white/60 backdrop-blur-xl rounded-xl p-8 border border-white/20 shadow-lg">
+                <div className="mb-6">
+                  <h3 className="text-2xl font-bold text-gray-800 mb-2">Agent Chat</h3>
+                  <p className="text-gray-700 mb-4">Ask anything about the selected pages. The agent will use the right tools automatically.</p>
+                  <div className="h-96 overflow-y-auto bg-white/80 rounded-lg border border-white/10 p-4 mb-4" style={{ minHeight: 300 }}>
+                    {chatMessages.map((msg, idx) => (
+                      <div key={idx} className={`mb-4 ${msg.role === 'user' ? 'text-right' : 'text-left'}`}> 
+                        {msg.role === 'user' ? (
+                          <div className="inline-block bg-orange-100 text-orange-900 px-4 py-2 rounded-lg max-w-xl">{msg.text}</div>
+                        ) : (
+                          <div>
+                            {msg.tools && (
+                              <div className="mb-2">
+                                <div className="font-semibold text-gray-700 mb-1">Used Tools:</div>
+                                <div className="flex flex-wrap gap-2">
+                                  {msg.tools.map(tool => (
+                                    <button
+                                      key={tool.id}
+                                      onClick={() => setActiveTab(tool.id)}
+                                      className={`flex items-center space-x-2 px-3 py-1 rounded-lg border text-sm font-medium ${activeTab === tool.id ? 'bg-orange-500 text-white' : 'bg-white text-orange-700 border-orange-200 hover:bg-orange-100'}`}
+                                    >
+                                      <tool.icon className="w-4 h-4" />
+                                      <span>{tool.label}</span>
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {msg.tools && msg.tools.length > 0 && (
+                              <div className="mt-2 bg-white/90 border border-orange-100 rounded-lg p-4">
+                                {msg.tools.find(t => t.id === activeTab)?.content.split('\n').map((line, i) => (
+                                  <div key={i} className="text-gray-800 mb-1 whitespace-pre-line">{line}</div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    <div ref={chatEndRef} />
+                  </div>
+                  <form onSubmit={handleChatSubmit} className="flex gap-2">
+                    <input
+                      type="text"
+                      value={chatInput}
+                      onChange={e => setChatInput(e.target.value)}
+                      placeholder="Type your instruction..."
+                      className="flex-1 p-3 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white/70 backdrop-blur-sm"
+                    />
+                    <button
+                      type="submit"
+                      className="px-6 py-3 bg-orange-500/90 text-white rounded-lg hover:bg-orange-600 transition-colors font-semibold border border-white/10"
+                      disabled={!chatInput.trim()}
+                    >
+                      <Send className="w-5 h-5" />
+                    </button>
+                  </form>
                 </div>
               </div>
             </div>
