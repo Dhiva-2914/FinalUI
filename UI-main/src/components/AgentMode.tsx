@@ -778,153 +778,172 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                       if (/image|chart|graph|visualiz/.test(lowerGoal)) featuresToRun.push('image');
                       if (featuresToRun.length === 0) featuresToRun.push('search');
                       setTimeout(async () => {
-                        setIsPlanning(false);
-                        setIsExecuting(true);
-                        const results = [];
-                        for (const feature of featuresToRun) {
-                          let label = '';
-                          let icon = FileText;
-                          if (feature === 'search') {
-                            label = 'AI Powered Search';
-                            icon = Search;
-                            // Run search for all selected pages at once
-                            const result = await apiService.search({
-                              space_key: selectedSpace,
-                              page_titles: selectedPages,
-                              query: goal
-                            });
-                            // Create one result for the search across all pages
-                            results.push({ id: feature, label, icon, content: result.response || 'No response.', page: selectedPages.map(p => p.trim()).join(', '), type: 'text' });
-                          } else if (feature === 'code') {
-                            label = 'Code Assistant';
-                            icon = Code;
-                            // Run code assistant for each selected page
-                            for (const page of selectedPages) {
-                              const result = await apiService.codeAssistant({
-                                space_key: selectedSpace,
-                                page_title: page,
-                                instruction: goal
-                              });
-                              const content = result.modified_code || result.original_code || '';
-                              results.push({ id: `${feature}-${page}`, label, icon, content, page: page.trim(), type: 'code' });
-                            }
-                          } else if (feature === 'video') {
-                            label = 'Video Summarizer';
-                            icon = Video;
-                            // Run video summarizer for each selected page
-                            for (const page of selectedPages) {
-                              const result = await apiService.videoSummarizer({
-                                space_key: selectedSpace,
-                                page_title: page,
-                                question: goal
-                              });
-                              const content = {
-                                summary: result.summary,
-                                quotes: result.quotes || [],
-                                timestamps: result.timestamps || []
-                              };
-                              results.push({ id: `${feature}-${page}`, label, icon, content, page: page.trim(), type: 'video' });
-                            }
-                          } else if (feature === 'impact') {
-                            label = 'Impact Analyzer';
-                            icon = TrendingUp;
-                            // Use first two selected pages for old/new
-                            const oldPage = selectedPages[0];
-                            const newPage = selectedPages[1] || selectedPages[0];
-                            const result = await apiService.impactAnalyzer({
-                              space_key: selectedSpace,
-                              old_page_title: oldPage,
-                              new_page_title: newPage,
-                              question: goal
-                            });
-                            results.push({ id: feature, label, icon, content: result.diff || '', page: oldPage.trim(), type: 'diff' });
-                          } else if (feature === 'test') {
-                            label = 'Test Support Tool';
-                            icon = TestTube;
-                            // Run test support for each selected page
-                            for (const page of selectedPages) {
-                              const result = await apiService.testSupport({
-                                space_key: selectedSpace,
-                                code_page_title: page,
-                                question: goal
-                              });
-                              results.push({ id: `${feature}-${page}`, label, icon, content: result.test_strategy || '', page: page.trim(), type: 'summary' });
-                            }
-                          } else if (feature === 'image') {
-                            label = 'Image Insights';
-                            icon = Image;
-                            // Run image insights for each selected page
-                            for (const page of selectedPages) {
-                              try {
-                                // Get images from the page
-                                const imagesResult = await apiService.getImages(selectedSpace, page);
-                                if (imagesResult.images && imagesResult.images.length > 0) {
-                                  // Use the first image for analysis
-                                  const imageUrl = imagesResult.images[0];
-                                  const imageResult = await apiService.imageSummary({
+                        try {
+                          setIsPlanning(false);
+                          setIsExecuting(true);
+                          const results = [];
+                          for (const feature of featuresToRun) {
+                            let label = '';
+                            let icon = FileText;
+                            try {
+                              if (feature === 'search') {
+                                label = 'AI Powered Search';
+                                icon = Search;
+                                // Run search for all selected pages at once
+                                const result = await apiService.search({
+                                  space_key: selectedSpace,
+                                  page_titles: selectedPages,
+                                  query: goal
+                                });
+                                // Create one result for the search across all pages
+                                results.push({ id: feature, label, icon, content: result.response || 'No response.', page: selectedPages.map(p => p.trim()).join(', '), type: 'text' });
+                              } else if (feature === 'code') {
+                                label = 'Code Assistant';
+                                icon = Code;
+                                // Run code assistant for each selected page
+                                for (const page of selectedPages) {
+                                  const result = await apiService.codeAssistant({
                                     space_key: selectedSpace,
                                     page_title: page,
-                                    image_url: imageUrl
+                                    instruction: goal
                                   });
-                                  
-                                  const content = {
-                                    chartType: 'bar',
-                                    data: {
-                                      labels: ['Category 1', 'Category 2', 'Category 3', 'Category 4'],
-                                      values: [65, 45, 80, 30]
-                                    },
-                                    description: imageResult.summary || 'Image analysis completed with chart generation.',
-                                    insights: [
-                                      'Peak value observed in Category 3',
-                                      'Category 2 shows moderate performance',
-                                      'Category 4 has the lowest values',
-                                      'Overall trend shows varied distribution'
-                                    ]
-                                  };
-                                  results.push({ id: `${feature}-${page}`, label, icon, content, page: page.trim(), type: 'image' });
-                                } else {
-                                  // No images found, create placeholder content
-                                  const content = {
-                                    chartType: 'bar',
-                                    data: {
-                                      labels: ['Category 1', 'Category 2', 'Category 3', 'Category 4'],
-                                      values: [65, 45, 80, 30]
-                                    },
-                                    description: 'No images found on this page. Chart generation would be available when images are present.',
-                                    insights: [
-                                      'No image data available for analysis',
-                                      'Please ensure the page contains images for chart generation',
-                                      'Image insights will be generated when images are detected'
-                                    ]
-                                  };
-                                  results.push({ id: `${feature}-${page}`, label, icon, content, page: page.trim(), type: 'image' });
+                                  const content = result.modified_code || result.original_code || '';
+                                  results.push({ id: `${feature}-${page}`, label, icon, content, page: page.trim(), type: 'code' });
                                 }
-                              } catch (err) {
-                                // Fallback to placeholder content if API fails
-                                const content = {
-                                  chartType: 'bar',
-                                  data: {
-                                    labels: ['Category 1', 'Category 2', 'Category 3', 'Category 4'],
-                                    values: [65, 45, 80, 30]
-                                  },
-                                  description: 'Image analysis and chart generation would be shown here.',
-                                  insights: [
-                                    'Peak value observed in Category 3',
-                                    'Category 2 shows moderate performance',
-                                    'Category 4 has the lowest values',
-                                    'Overall trend shows varied distribution'
-                                  ]
-                                };
-                                results.push({ id: `${feature}-${page}`, label, icon, content, page: page.trim(), type: 'image' });
+                              } else if (feature === 'video') {
+                                label = 'Video Summarizer';
+                                icon = Video;
+                                // Run video summarizer for each selected page
+                                for (const page of selectedPages) {
+                                  const result = await apiService.videoSummarizer({
+                                    space_key: selectedSpace,
+                                    page_title: page,
+                                    question: goal
+                                  });
+                                  const content = {
+                                    summary: result.summary,
+                                    quotes: result.quotes || [],
+                                    timestamps: result.timestamps || []
+                                  };
+                                  results.push({ id: `${feature}-${page}`, label, icon, content, page: page.trim(), type: 'video' });
+                                }
+                              } else if (feature === 'impact') {
+                                label = 'Impact Analyzer';
+                                icon = TrendingUp;
+                                // Use first two selected pages for old/new
+                                const oldPage = selectedPages[0];
+                                const newPage = selectedPages[1] || selectedPages[0];
+                                const result = await apiService.impactAnalyzer({
+                                  space_key: selectedSpace,
+                                  old_page_title: oldPage,
+                                  new_page_title: newPage,
+                                  question: goal
+                                });
+                                results.push({ id: feature, label, icon, content: result.diff || '', page: oldPage.trim(), type: 'diff' });
+                              } else if (feature === 'test') {
+                                label = 'Test Support Tool';
+                                icon = TestTube;
+                                // Run test support for each selected page
+                                for (const page of selectedPages) {
+                                  const result = await apiService.testSupport({
+                                    space_key: selectedSpace,
+                                    code_page_title: page,
+                                    question: goal
+                                  });
+                                  results.push({ id: `${feature}-${page}`, label, icon, content: result.test_strategy || '', page: page.trim(), type: 'summary' });
+                                }
+                              } else if (feature === 'image') {
+                                label = 'Image Insights';
+                                icon = Image;
+                                // Run image insights for each selected page
+                                for (const page of selectedPages) {
+                                  try {
+                                    // Get images from the page
+                                    const imagesResult = await apiService.getImages(selectedSpace, page);
+                                    if (imagesResult.images && imagesResult.images.length > 0) {
+                                      // Use the first image for analysis
+                                      const imageUrl = imagesResult.images[0];
+                                      const imageResult = await apiService.imageSummary({
+                                        space_key: selectedSpace,
+                                        page_title: page,
+                                        image_url: imageUrl
+                                      });
+                                      
+                                      const content = {
+                                        chartType: 'bar',
+                                        data: {
+                                          labels: ['Category 1', 'Category 2', 'Category 3', 'Category 4'],
+                                          values: [65, 45, 80, 30]
+                                        },
+                                        description: imageResult.summary || 'Image analysis completed with chart generation.',
+                                        insights: [
+                                          'Peak value observed in Category 3',
+                                          'Category 2 shows moderate performance',
+                                          'Category 4 has the lowest values',
+                                          'Overall trend shows varied distribution'
+                                        ]
+                                      };
+                                      results.push({ id: `${feature}-${page}`, label, icon, content, page: page.trim(), type: 'image' });
+                                    } else {
+                                      // No images found, create placeholder content
+                                      const content = {
+                                        chartType: 'bar',
+                                        data: {
+                                          labels: ['Category 1', 'Category 2', 'Category 3', 'Category 4'],
+                                          values: [65, 45, 80, 30]
+                                        },
+                                        description: 'No images found on this page. Chart generation would be available when images are present.',
+                                        insights: [
+                                          'No image data available for analysis',
+                                          'Please ensure the page contains images for chart generation',
+                                          'Image insights will be generated when images are detected'
+                                        ]
+                                      };
+                                      results.push({ id: `${feature}-${page}`, label, icon, content, page: page.trim(), type: 'image' });
+                                    }
+                                  } catch (err) {
+                                    // Fallback to placeholder content if API fails
+                                    const content = {
+                                      chartType: 'bar',
+                                      data: {
+                                        labels: ['Category 1', 'Category 2', 'Category 3', 'Category 4'],
+                                        values: [65, 45, 80, 30]
+                                      },
+                                      description: 'Image analysis and chart generation would be shown here.',
+                                      insights: [
+                                        'Peak value observed in Category 3',
+                                        'Category 2 shows moderate performance',
+                                        'Category 4 has the lowest values',
+                                        'Overall trend shows varied distribution'
+                                      ]
+                                    };
+                                    results.push({ id: `${feature}-${page}`, label, icon, content, page: page.trim(), type: 'image' });
+                                  }
+                                }
                               }
+                            } catch (err) {
+                              console.error(`Error processing feature ${feature}:`, err);
+                              // Add error result for this feature
+                              results.push({ 
+                                id: feature, 
+                                label: label || feature, 
+                                icon, 
+                                content: `Error processing ${feature}: ${err.message || 'Unknown error'}`, 
+                                page: selectedPages.join(', '), 
+                                type: 'text' 
+                              });
                             }
                           }
+                          setOutputTabs(results);
+                          setActiveTab(results[0]?.id || 'answer');
+                          setChatHistory(prev => [...prev, { role: 'agent', text: 'I have processed your request. Check the Used Tools section for the results.' }]);
+                        } catch (err) {
+                          console.error('Error in execution:', err);
+                          setError('An error occurred while processing your request. Please try again.');
+                        } finally {
+                          setIsExecuting(false);
+                          setShowFollowUp(true);
                         }
-                        setOutputTabs(results);
-                        setActiveTab(results[0]?.id || 'answer');
-                        setIsExecuting(false);
-                        setShowFollowUp(true);
-                        setChatHistory(prev => [...prev, { role: 'agent', text: 'I have processed your request. Check the Used Tools section for the results.' }]);
                       }, 1500);
                     }}
                     className="flex items-center space-x-4"
@@ -969,84 +988,20 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
           )}
 
           {/* Execution Phase */}
-          {planSteps.length > 0 && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Left Column - Progress Timeline */}
-              <div className="lg:col-span-1">
-                <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg">
-                  <h3 className="font-semibold text-gray-800 mb-4">Live Progress Log</h3>
-                  <div className="space-y-4">
-                    {planSteps.map((step, index) => (
-                      <div key={step.id} className="flex items-start space-x-3">
-                        <div className="flex-shrink-0 mt-1">
-                          {step.status === 'completed' ? (
-                            <CheckCircle className="w-5 h-5 text-green-500" />
-                          ) : step.status === 'running' ? (
-                            <Loader2 className="w-5 h-5 text-orange-500 animate-spin" />
-                          ) : (
-                            <div className="w-5 h-5 border-2 border-gray-300 rounded-full" />
-                          )}
-                        </div>
-                        <div className="flex-1">
-                          <div className="font-medium text-gray-800">{step.title}</div>
-                          {step.details && (
-                            <div className="text-sm text-gray-600 mt-1">{step.details}</div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  
-                  {/* Progress Bar */}
-                  <div className="mt-6">
-                    <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
-                      <span>Progress</span>
-                      <span>{Math.round(((currentStep + 1) / planSteps.length) * 100)}%</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="bg-orange-500 h-2 rounded-full transition-all duration-500"
-                        style={{ width: `${((currentStep + 1) / planSteps.length) * 100}%` }}
-                      />
-                    </div>
-                  </div>
+          {isExecuting && (
+            <div className="max-w-4xl mx-auto">
+              <div className="bg-white/60 backdrop-blur-xl rounded-xl p-8 border border-white/20 shadow-lg text-center">
+                <div className="flex items-center justify-center space-x-3 mb-4">
+                  <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
+                  <h3 className="text-xl font-bold text-gray-800">Processing your request...</h3>
                 </div>
-              </div>
-
-              {/* Right Columns - Output Tabs */}
-              <div className="lg:col-span-2">
-                {outputTabs.length > 0 && (
-                  <div className="bg-white/60 backdrop-blur-xl rounded-xl border border-white/20 shadow-lg overflow-hidden">
-                    {/* Tab Headers */}
-                    <div className="border-b border-white/20 bg-white/40 backdrop-blur-sm">
-                      <div className="flex overflow-x-auto">
-                        {outputTabs.map(tab => {
-                          const Icon = tab.icon;
-                          return (
-                            <button
-                              key={tab.id}
-                              onClick={() => setActiveTab(tab.id)}
-                              className={`flex items-center space-x-2 px-4 py-3 border-b-2 transition-colors whitespace-nowrap ${
-                                activeTab === tab.id
-                                  ? 'border-orange-500 text-orange-600 bg-white/50'
-                                  : 'border-transparent text-gray-600 hover:text-gray-800 hover:bg-white/30'
-                              }`}
-                            >
-                              <Icon className="w-4 h-4" />
-                              <span className="text-sm font-medium">{tab.label}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    {/* Tab Content */}
-                      <div className="p-4">
-                        {outputTabs.find(tab => tab.id === activeTab)?.content.split('\n').map((line, idx) => (
-                          <div key={idx} className="text-gray-800 mb-1 whitespace-pre-line">{line}</div>
-                        ))}
-                        </div>
-                    </div>
-                  </div>
-                )}
+                <div className="flex items-center justify-center space-x-4 text-gray-600">
+                  <span>1. Analyzing content</span>
+                  <span>→</span>
+                  <span>2. Generating results</span>
+                  <span>→</span>
+                  <span>3. Preparing output</span>
+                </div>
               </div>
             </div>
           )}
