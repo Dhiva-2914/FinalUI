@@ -466,21 +466,24 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                 {/* Page Selection */}
                 <div className="mb-4 text-left">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Select Pages to Analyze</label>
-                  <div className="relative">
-                    <select
-                      multiple
-                      value={selectedPages}
-                      onChange={e => {
-                        const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
-                        setSelectedPages(selectedOptions);
-                      }}
-                      className="w-full p-3 border border-white/30 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 appearance-none bg-white/70 backdrop-blur-sm min-h-32"
-                    >
-                      {pages.map(page => (
-                        <option key={page} value={page}>{page}</option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-3 top-3 w-5 h-5 text-gray-400" />
+                  <div className="space-y-2 max-h-40 overflow-y-auto border border-white/30 rounded-lg p-2 bg-white/50 backdrop-blur-sm">
+                    {pages.map(page => (
+                      <label key={page} className="flex items-center space-x-2 p-2 hover:bg-white/30 rounded cursor-pointer backdrop-blur-sm">
+                        <input
+                          type="checkbox"
+                          checked={selectedPages.includes(page)}
+                          onChange={e => {
+                            if (e.target.checked) {
+                              setSelectedPages([...selectedPages, page]);
+                            } else {
+                              setSelectedPages(selectedPages.filter(p => p !== page));
+                            }
+                          }}
+                          className="rounded border-gray-300 text-orange-500 focus:ring-orange-500"
+                        />
+                        <span className="text-sm text-gray-700">{page}</span>
+                      </label>
+                    ))}
                   </div>
                   <p className="text-sm text-gray-500 mt-1">{selectedPages.length} page(s) selected</p>
                 </div>
@@ -531,21 +534,24 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                   {/* Page Selection */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Selected Pages ({selectedPages.length})</label>
-                    <div className="relative">
-                      <select
-                        multiple
-                        value={selectedPages}
-                        onChange={e => {
-                          const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
-                          setSelectedPages(selectedOptions);
-                        }}
-                        className="w-full p-3 border border-white/30 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 appearance-none bg-white/70 backdrop-blur-sm min-h-24"
-                      >
-                        {pages.map(page => (
-                          <option key={page} value={page}>{page}</option>
-                        ))}
-                      </select>
-                      <ChevronDown className="absolute right-3 top-3 w-5 h-5 text-gray-400" />
+                    <div className="space-y-2 max-h-32 overflow-y-auto border border-white/30 rounded-lg p-2 bg-white/50 backdrop-blur-sm">
+                      {pages.map(page => (
+                        <label key={page} className="flex items-center space-x-2 p-2 hover:bg-white/30 rounded cursor-pointer backdrop-blur-sm">
+                          <input
+                            type="checkbox"
+                            checked={selectedPages.includes(page)}
+                            onChange={e => {
+                              if (e.target.checked) {
+                                setSelectedPages([...selectedPages, page]);
+                              } else {
+                                setSelectedPages(selectedPages.filter(p => p !== page));
+                              }
+                            }}
+                            className="rounded border-gray-300 text-orange-500 focus:ring-orange-500"
+                          />
+                          <span className="text-sm text-gray-700">{page}</span>
+                        </label>
+                      ))}
                     </div>
                     <div className="flex items-center space-x-2 mt-2">
                       <input
@@ -675,20 +681,33 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                                             <h5 className="font-semibold text-gray-800 mb-3">Generated Chart</h5>
                                             <p className="text-gray-700 mb-3">{imageData.description}</p>
                                             
-                                            {/* Simple Bar Chart Visualization */}
-                                            <div className="mb-4">
-                                              <div className="flex items-end space-x-2 h-32">
-                                                {imageData.data.values.map((value, index) => (
-                                                  <div key={index} className="flex-1 flex flex-col items-center">
-                                                    <div 
-                                                      className="bg-orange-500 rounded-t w-full"
-                                                      style={{ height: `${(value / Math.max(...imageData.data.values)) * 100}%` }}
-                                                    ></div>
-                                                    <span className="text-xs text-gray-600 mt-1 text-center">{imageData.data.labels[index]}</span>
-                                                  </div>
-                                                ))}
+                                            {/* Display actual chart image if available */}
+                                            {imageData.chartUrl ? (
+                                              <div className="mb-4">
+                                                <div className="w-full h-64 bg-gradient-to-br from-orange-500/10 to-orange-600/10 rounded-lg flex items-center justify-center border border-white/20 overflow-hidden">
+                                                  <img 
+                                                    src={imageData.chartUrl} 
+                                                    alt="Generated Chart"
+                                                    className="w-full h-full object-contain"
+                                                  />
+                                                </div>
                                               </div>
-                                            </div>
+                                            ) : (
+                                              /* Fallback to simple bar chart visualization */
+                                              <div className="mb-4">
+                                                <div className="flex items-end space-x-2 h-32">
+                                                  {imageData.data.values.map((value, index) => (
+                                                    <div key={index} className="flex-1 flex flex-col items-center">
+                                                      <div 
+                                                        className="bg-orange-500 rounded-t w-full"
+                                                        style={{ height: `${(value / Math.max(...imageData.data.values)) * 100}%` }}
+                                                      ></div>
+                                                      <span className="text-xs text-gray-600 mt-1 text-center">{imageData.data.labels[index]}</span>
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              </div>
+                                            )}
                                             
                                             {/* Insights */}
                                             <div className="mt-4">
@@ -852,7 +871,28 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                                         image_url: imageUrl
                                       });
                                       
+                                      // Create actual chart using the chart API
+                                      const chartResult = await apiService.createChart({
+                                        space_key: selectedSpace,
+                                        page_title: page,
+                                        image_url: imageUrl,
+                                        chart_type: 'Grouped Bar',
+                                        filename: 'chart',
+                                        format: 'png'
+                                      });
+                                      
+                                      // Convert base64 to blob URL for display
+                                      const binaryString = atob(chartResult.chart_data);
+                                      const bytes = new Uint8Array(binaryString.length);
+                                      for (let i = 0; i < binaryString.length; i++) {
+                                        bytes[i] = binaryString.charCodeAt(i);
+                                      }
+                                      const blob = new Blob([bytes], { type: chartResult.mime_type });
+                                      const chartUrl = URL.createObjectURL(blob);
+                                      
                                       const content = {
+                                        chartUrl: chartUrl,
+                                        summary: imageResult.summary || 'Image analysis completed with chart generation.',
                                         chartType: 'bar',
                                         data: {
                                           labels: ['Category 1', 'Category 2', 'Category 3', 'Category 4'],
@@ -885,6 +925,7 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                                       results.push({ id: `${feature}-${page}`, label, icon, content, page: page.trim(), type: 'image' });
                                     }
                                   } catch (err) {
+                                    console.error('Image insights error:', err);
                                     // Fallback to placeholder content if API fails
                                     const content = {
                                       chartType: 'bar',
