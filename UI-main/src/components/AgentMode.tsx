@@ -575,25 +575,25 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                     <div className="space-y-6">
                       {/* Feature Buttons */}
                       <div className="flex flex-wrap gap-2 mb-4">
-                        {Array.from(new Set(outputTabs.map(tab => tab.label))).map(featureLabel => (
-                  <button
-                            key={featureLabel}
-                            onClick={() => setSelectedFeature(selectedFeature === featureLabel ? null : featureLabel)}
+                        {outputTabs.length > 0 && outputTabs[0].label && (
+                          <button
+                            key={outputTabs[0].label}
+                            onClick={() => setSelectedFeature(selectedFeature === outputTabs[0].label ? null : outputTabs[0].label)}
                             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${
-                              selectedFeature === featureLabel
+                              selectedFeature === outputTabs[0].label
                                 ? 'bg-orange-500 text-white border-orange-500'
                                 : 'bg-white/70 text-gray-700 border-gray-300 hover:bg-orange-50 hover:border-orange-300'
                             }`}
                           >
-                            {featureLabel}
+                            {outputTabs[0].label}
                           </button>
-                        ))}
+                        )}
                       </div>
 
                       {/* Output Display */}
-                      {selectedFeature ? (
+                      {selectedFeature && outputTabs.length > 0 ? (
                         <div className="space-y-6">
-                          {outputTabs.filter(tab => tab.label === selectedFeature).map(tab => {
+                          {outputTabs.map(tab => {
                             return (
                               <div key={tab.id} className="bg-white/90 rounded-lg p-4 border border-orange-100">
                                 <h5 className="text-md font-bold mb-2 text-orange-700">
@@ -772,21 +772,23 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                       setIsPlanning(true);
                       setOutputTabs([]);
                       setSelectedFeature(null);
-                      // Feature detection and execution for all features
-                      const featuresToRun = [];
+                      // Feature detection - determine which single feature to run
                       const lowerGoal = goal.toLowerCase();
-                      if (/code|convert|refactor|translate|language/.test(lowerGoal)) featuresToRun.push('code');
-                      if (/video|summariz.*video|extract.*quote|video.*summariz/.test(lowerGoal)) featuresToRun.push('video');
-                      if (/impact|compare|diff|change|version/.test(lowerGoal)) featuresToRun.push('impact');
-                      if (/test|strategy|cross-platform|sensitivity|test.*support|support.*tool/.test(lowerGoal)) featuresToRun.push('test');
-                      if (/image|chart|graph|visualiz/.test(lowerGoal)) featuresToRun.push('image');
-                      if (featuresToRun.length === 0) featuresToRun.push('code');
+                      let featureToRun = '';
+                      if (/code|convert|refactor|translate|language/.test(lowerGoal)) featureToRun = 'code';
+                      else if (/video|summariz.*video|extract.*quote|video.*summariz/.test(lowerGoal)) featureToRun = 'video';
+                      else if (/impact|compare|diff|change|version/.test(lowerGoal)) featureToRun = 'impact';
+                      else if (/test|strategy|cross-platform|sensitivity|test.*support|support.*tool/.test(lowerGoal)) featureToRun = 'test';
+                      else if (/image|chart|graph|visualiz/.test(lowerGoal)) featureToRun = 'image';
+                      else featureToRun = 'code'; // fallback
+                      
                       setTimeout(async () => {
                         try {
                           setIsPlanning(false);
                           setIsExecuting(true);
                           const results = [];
-                          for (const feature of featuresToRun) {
+                          // Only run the single detected feature
+                          const feature = featureToRun;
                             let label = '';
                             let icon = FileText;
                             try {
@@ -959,7 +961,10 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                             }
                           }
                           setOutputTabs(results);
-                          setActiveTab(results[0]?.id || 'answer');
+                          // Automatically select the feature that was executed
+                          if (results.length > 0) {
+                            setSelectedFeature(results[0].label);
+                          }
                           setChatHistory(prev => [...prev, { role: 'agent', text: 'I have processed your request. Check the Used Tools section for the results.' }]);
                         } catch (err) {
                           console.error('Error in execution:', err);
