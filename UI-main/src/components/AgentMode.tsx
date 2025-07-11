@@ -105,11 +105,13 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect, autoSpaceK
     setSelectAllPages(!selectAllPages);
   };
 
+  const [showVideoSummarizer, setShowVideoSummarizer] = useState(false);
   const handleGoalSubmit = async () => {
     if (!goal.trim()) return;
     setIsPlanning(true);
     setPlanSteps([]);
     setOutputTabs([]);
+    setShowVideoSummarizer(false);
 
     // Feature detection (simple keyword-based)
     const featuresToRun = [];
@@ -198,10 +200,8 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect, autoSpaceK
         }
       }
       setOutputTabs(results);
-      setActiveTab(results[0]?.id || 'answer');
       setIsExecuting(false);
-      setShowFollowUp(true);
-    }, 1500);
+    }, 1000);
   };
 
   const executeSteps = async (steps: PlanStep[]) => {
@@ -989,3 +989,18 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
 };
 
 export default AgentMode; 
+
+{
+  showVideoSummarizer && (
+    <VideoSummarizer
+      onClose={() => setShowVideoSummarizer(false)}
+      onFeatureSelect={setSelectedFeature}
+      autoSpaceKey={autoSpaceKey}
+      isSpaceAutoConnected={isSpaceAutoConnected}
+    />
+  )}
+</div>
+  );
+};
+
+export default AgentMode;
