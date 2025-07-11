@@ -521,42 +521,57 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
           {showSpacePageSelection && selectedSpace && selectedPages.length > 0 && (
             <div className="space-y-6">
               {/* Space and Page Selection Row */}
-              <div className="bg-white/80 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-white/80 backdrop-blur-xl rounded-xl p-6 border border-white/20 shadow-lg">
+                <h3 className="text-lg font-bold text-gray-800 mb-4">Selected Space & Pages</h3>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   {/* Space Selection */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Selected Space</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Confluence Space</label>
                     <div className="relative">
                       <select
                         value={selectedSpace}
                         onChange={e => setSelectedSpace(e.target.value)}
-                        className="w-full p-2 border border-white/30 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 appearance-none bg-white/70 backdrop-blur-sm text-sm"
+                        className="w-full p-3 border border-white/30 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 appearance-none bg-white/70 backdrop-blur-sm"
                       >
                         <option value="">Choose a space...</option>
                         {spaces.map(space => (
                           <option key={space.key} value={space.key}>{space.name} ({space.key})</option>
                         ))}
                       </select>
-                      <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                     </div>
                   </div>
                   {/* Page Selection */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Selected Pages</label>
-                    <div className="space-y-1 max-h-20 overflow-y-auto border border-white/30 rounded-lg p-2 bg-white/50 backdrop-blur-sm">
-                      {selectedPages.map(page => (
-                        <div key={page} className="flex items-center justify-between text-xs">
-                          <span className="text-gray-700">{page}</span>
-                          <button
-                            onClick={() => setSelectedPages(selectedPages.filter(p => p !== page))}
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            ×
-                          </button>
-                        </div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Selected Pages ({selectedPages.length})</label>
+                    <div className="space-y-2 max-h-32 overflow-y-auto border border-white/30 rounded-lg p-2 bg-white/50 backdrop-blur-sm">
+                      {pages.map(page => (
+                        <label key={page} className="flex items-center space-x-2 p-2 hover:bg-white/30 rounded cursor-pointer backdrop-blur-sm">
+                          <input
+                            type="checkbox"
+                            checked={selectedPages.includes(page)}
+                            onChange={e => {
+                              if (e.target.checked) {
+                                setSelectedPages([...selectedPages, page]);
+                              } else {
+                                setSelectedPages(selectedPages.filter(p => p !== page));
+                              }
+                            }}
+                            className="rounded border-gray-300 text-orange-500 focus:ring-orange-500"
+                          />
+                          <span className="text-sm text-gray-700">{page}</span>
+                        </label>
                       ))}
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">{selectedPages.length} page(s) selected</p>
+                    <div className="flex items-center space-x-2 mt-2">
+                      <input
+                        type="checkbox"
+                        checked={selectAllPages}
+                        onChange={toggleSelectAllPages}
+                        className="rounded border-gray-300 text-orange-500 focus:ring-orange-500"
+                      />
+                      <span className="text-sm text-gray-700 font-medium">Select All Pages</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -704,80 +719,80 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                         setIsPlanning(false);
                         setIsExecuting(true);
                         const results = [];
+                        // Process each feature for each selected page
                         for (const feature of featuresToRun) {
-                          let content = '';
-                          let label = '';
-                          let icon = FileText;
-                          try {
-                            if (feature === 'search') {
-                              label = 'AI Powered Search';
-                              icon = Search;
-                              const result = await apiService.search({
-                                space_key: selectedSpace,
-                                page_titles: selectedPages,
-                                query: goal
-                              });
-                              content = result.response || 'No response.';
-                              results.push({ id: feature, label, icon, content, page: selectedPages[0], type: 'text' });
-                            } else if (feature === 'code') {
-                              label = 'Code Assistant';
-                              icon = Code;
-                              const page = selectedPages[0];
-                              const result = await apiService.codeAssistant({
-                                space_key: selectedSpace,
-                                page_title: page,
-                                instruction: goal
-                              });
-                              content = result.modified_code || result.original_code || '';
-                              results.push({ id: feature, label, icon, content, page, type: 'code' });
-                            } else if (feature === 'video') {
-                              label = 'Video Summarizer';
-                              icon = Video;
-                              const page = selectedPages[0];
-                              const result = await apiService.videoSummarizer({
-                                space_key: selectedSpace,
-                                page_title: page,
-                                question: goal
-                              });
-                              content = {
-                                summary: result.summary,
-                                quotes: result.quotes || [],
-                                timestamps: result.timestamps || []
-                              };
-                              results.push({ id: feature, label, icon, content, page, type: 'video' });
-                            } else if (feature === 'impact') {
-                              label = 'Impact Analyzer';
-                              icon = TrendingUp;
-                              const oldPage = selectedPages[0];
-                              const newPage = selectedPages[1] || selectedPages[0];
-                              const result = await apiService.impactAnalyzer({
-                                space_key: selectedSpace,
-                                old_page_title: oldPage,
-                                new_page_title: newPage,
-                                question: goal
-                              });
-                              content = result.diff || '';
-                              results.push({ id: feature, label, icon, content, page: oldPage, type: 'diff' });
-                            } else if (feature === 'test') {
-                              label = 'Test Support Tool';
-                              icon = TestTube;
-                              const codePage = selectedPages[0];
-                              const result = await apiService.testSupport({
-                                space_key: selectedSpace,
-                                code_page_title: codePage,
-                                question: goal
-                              });
-                              content = result.test_strategy || '';
-                              results.push({ id: feature, label, icon, content, page: codePage, type: 'summary' });
-                            } else if (feature === 'image') {
-                              label = 'Image Insights';
-                              icon = Image;
-                              const page = selectedPages[0];
-                              content = 'Image analysis and chart generation would be shown here.';
-                              results.push({ id: feature, label, icon, content, page, type: 'image' });
+                          for (const page of selectedPages) {
+                            let content = '';
+                            let label = '';
+                            let icon = FileText;
+                            try {
+                              if (feature === 'search') {
+                                label = 'AI Powered Search';
+                                icon = Search;
+                                const result = await apiService.search({
+                                  space_key: selectedSpace,
+                                  page_titles: [page],
+                                  query: goal
+                                });
+                                content = result.response || 'No response.';
+                                results.push({ id: `${feature}-${page}`, label, icon, content, page, type: 'text' });
+                              } else if (feature === 'code') {
+                                label = 'Code Assistant';
+                                icon = Code;
+                                const result = await apiService.codeAssistant({
+                                  space_key: selectedSpace,
+                                  page_title: page,
+                                  instruction: goal
+                                });
+                                content = result.modified_code || result.original_code || '';
+                                results.push({ id: `${feature}-${page}`, label, icon, content, page, type: 'code' });
+                              } else if (feature === 'video') {
+                                label = 'Video Summarizer';
+                                icon = Video;
+                                const result = await apiService.videoSummarizer({
+                                  space_key: selectedSpace,
+                                  page_title: page,
+                                  question: goal
+                                });
+                                content = {
+                                  summary: result.summary,
+                                  quotes: result.quotes || [],
+                                  timestamps: result.timestamps || []
+                                };
+                                results.push({ id: `${feature}-${page}`, label, icon, content, page, type: 'video' });
+                              } else if (feature === 'impact') {
+                                label = 'Impact Analyzer';
+                                icon = TrendingUp;
+                                // For impact, use current page and next page, or same page if only one
+                                const nextPage = selectedPages[selectedPages.indexOf(page) + 1] || page;
+                                const result = await apiService.impactAnalyzer({
+                                  space_key: selectedSpace,
+                                  old_page_title: page,
+                                  new_page_title: nextPage,
+                                  question: goal
+                                });
+                                content = result.diff || '';
+                                results.push({ id: `${feature}-${page}`, label, icon, content, page, type: 'diff' });
+                              } else if (feature === 'test') {
+                                label = 'Test Support Tool';
+                                icon = TestTube;
+                                const result = await apiService.testSupport({
+                                  space_key: selectedSpace,
+                                  code_page_title: page,
+                                  question: goal
+                                });
+                                content = result.test_strategy || '';
+                                results.push({ id: `${feature}-${page}`, label, icon, content, page, type: 'summary' });
+                              } else if (feature === 'image') {
+                                label = 'Image Insights';
+                                icon = Image;
+                                content = 'Image analysis and chart generation would be shown here.';
+                                results.push({ id: `${feature}-${page}`, label, icon, content, page, type: 'image' });
+                              }
+                            } catch (err) {
+                              content = 'Error: ' + (err.message || err.toString());
+                              results.push({ id: `${feature}-${page}`, label, icon, content, page, type: 'text' });
                             }
-                          } catch (err) {
-                            content = 'Error: ' + (err.message || err.toString());
                           }
                         }
                         setOutputTabs(results);
