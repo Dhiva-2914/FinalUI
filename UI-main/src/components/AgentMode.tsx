@@ -989,3 +989,14 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
 };
 
 export default AgentMode;
+// Add this inside the AgentMode component, before the return statement
+if (selectedFeature === 'video') {
+  return (
+    <VideoSummarizer
+      onClose={() => setSelectedFeature(null)}
+      onFeatureSelect={setSelectedFeature}
+      autoSpaceKey={autoSpaceKey}
+      isSpaceAutoConnected={isSpaceAutoConnected}
+    />
+  );
+}
