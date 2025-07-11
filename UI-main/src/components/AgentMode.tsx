@@ -114,13 +114,12 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect, autoSpaceK
     // Feature detection (simple keyword-based)
     const featuresToRun = [];
     const lowerGoal = goal.toLowerCase();
-    if (/search|analyz|summariz|find|explor|context/.test(lowerGoal)) featuresToRun.push('search');
     if (/code|convert|refactor|translate|language/.test(lowerGoal)) featuresToRun.push('code');
     if (/video|summariz.*video|extract.*quote/.test(lowerGoal)) featuresToRun.push('video');
     if (/impact|compare|diff|change|version/.test(lowerGoal)) featuresToRun.push('impact');
     if (/test|strategy|cross-platform|sensitivity/.test(lowerGoal)) featuresToRun.push('test');
     if (/image|chart|graph|visualiz/.test(lowerGoal)) featuresToRun.push('image');
-    if (featuresToRun.length === 0) featuresToRun.push('search'); // fallback
+    if (featuresToRun.length === 0) featuresToRun.push('code'); // fallback
 
     // Simulate planning steps
     setTimeout(async () => {
@@ -132,17 +131,7 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect, autoSpaceK
         let label = '';
         let icon: any = FileText;
         try {
-          if (feature === 'search') {
-            label = 'AI Powered Search';
-            icon = Search;
-            const result = await apiService.search({
-              space_key: selectedSpace,
-              page_titles: selectedPages,
-              query: goal
-            });
-            content = result.response || 'No response.';
-            results.push({ id: feature, label, icon, content, page: selectedPages[0], type: 'text' });
-          } else if (feature === 'code') {
+          if (feature === 'code') {
             label = 'Code Assistant';
             icon = Code;
             // Only use the first selected page for code
@@ -652,14 +641,14 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                                         </div>
                                       );
                                     } else if (tab.type === 'video') {
-                                      // Assume tab.content is an object with summary, quotes, timestamps
-                                      const video = tab.content;
+                                      // Handle video content - could be object or string
+                                      const video = typeof tab.content === 'object' ? tab.content : { summary: tab.content };
                                       return (
                                         <div key={tab.id} className="mb-4">
                                           <div className="flex items-center space-x-2 mb-2"><Icon className="w-4 h-4" /><span className="font-semibold">{tab.label}</span></div>
                                           <div className="bg-white/70 backdrop-blur-sm rounded-lg p-4 border border-white/20">
                                             <h5 className="font-semibold text-gray-800 mb-3">AI Summary</h5>
-                                            <p className="text-gray-700 mb-2">{video.summary}</p>
+                                            <p className="text-gray-700 mb-2">{video.summary || tab.content}</p>
                                             {video.quotes && video.quotes.length > 0 && (
                                               <div className="mb-2">
                                                 <h5 className="font-semibold text-gray-800 mb-1">Key Quotes</h5>
@@ -770,13 +759,12 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                       // Feature detection and execution for all features
                       const featuresToRun = [];
                       const lowerGoal = goal.toLowerCase();
-                      if (/search|analyz|summariz|find|explor|context|ai.*powered|powered.*search/.test(lowerGoal)) featuresToRun.push('search');
                       if (/code|convert|refactor|translate|language/.test(lowerGoal)) featuresToRun.push('code');
                       if (/video|summariz.*video|extract.*quote|video.*summariz/.test(lowerGoal)) featuresToRun.push('video');
                       if (/impact|compare|diff|change|version/.test(lowerGoal)) featuresToRun.push('impact');
                       if (/test|strategy|cross-platform|sensitivity|test.*support|support.*tool/.test(lowerGoal)) featuresToRun.push('test');
                       if (/image|chart|graph|visualiz/.test(lowerGoal)) featuresToRun.push('image');
-                      if (featuresToRun.length === 0) featuresToRun.push('search');
+                      if (featuresToRun.length === 0) featuresToRun.push('code');
                       setTimeout(async () => {
                         try {
                           setIsPlanning(false);
@@ -786,18 +774,7 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                             let label = '';
                             let icon = FileText;
                             try {
-                              if (feature === 'search') {
-                                label = 'AIPoweredSearch';
-                                icon = Search;
-                                // Run search for all selected pages at once
-                                const result = await apiService.search({
-                                  space_key: selectedSpace,
-                                  page_titles: selectedPages,
-                                  query: goal
-                                });
-                                // Create one result for the search across all pages
-                                results.push({ id: feature, label, icon, content: result.response || 'No response.', page: selectedPages.map(p => p.trim()).join(', '), type: 'text' });
-                              } else if (feature === 'code') {
+                              if (feature === 'code') {
                                 label = 'Code Assistant';
                                 icon = Code;
                                 // Run code assistant for each selected page
@@ -957,7 +934,7 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                     />
                     <button
                       type="submit"
-                      disabled={!goal.trim()}
+                    disabled={!goal.trim()}
                       className="bg-orange-500/90 backdrop-blur-sm text-white p-3 rounded-lg hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center space-x-2 transition-colors border border-white/10"
                   >
                     <Send className="w-5 h-5" />
@@ -994,7 +971,7 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                 <div className="flex items-center justify-center space-x-3 mb-4">
                   <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
                   <h3 className="text-xl font-bold text-gray-800">Processing your request...</h3>
-                </div>
+                        </div>
                 <div className="flex items-center justify-center space-x-4 text-gray-600">
                   <span>1. Analyzing content</span>
                   <span>→</span>
