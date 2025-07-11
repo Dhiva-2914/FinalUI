@@ -466,24 +466,21 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                 {/* Page Selection */}
                 <div className="mb-4 text-left">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Select Pages to Analyze</label>
-                  <div className="space-y-2 max-h-40 overflow-y-auto border border-white/30 rounded-lg p-2 bg-white/50 backdrop-blur-sm">
-                    {pages.map(page => (
-                      <label key={page} className="flex items-center space-x-2 p-2 hover:bg-white/30 rounded cursor-pointer backdrop-blur-sm">
-                        <input
-                          type="checkbox"
-                          checked={selectedPages.includes(page)}
-                          onChange={e => {
-                            if (e.target.checked) {
-                              setSelectedPages([...selectedPages, page]);
-                            } else {
-                              setSelectedPages(selectedPages.filter(p => p !== page));
-                            }
-                          }}
-                          className="rounded border-gray-300 text-orange-500 focus:ring-orange-500"
-                        />
-                        <span className="text-sm text-gray-700">{page}</span>
-                      </label>
-                    ))}
+                  <div className="relative">
+                    <select
+                      multiple
+                      value={selectedPages}
+                      onChange={e => {
+                        const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
+                        setSelectedPages(selectedOptions);
+                      }}
+                      className="w-full p-3 border border-white/30 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 appearance-none bg-white/70 backdrop-blur-sm min-h-32"
+                    >
+                      {pages.map(page => (
+                        <option key={page} value={page}>{page}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-3 w-5 h-5 text-gray-400" />
                   </div>
                   <p className="text-sm text-gray-500 mt-1">{selectedPages.length} page(s) selected</p>
                 </div>
@@ -534,24 +531,21 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                   {/* Page Selection */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Selected Pages ({selectedPages.length})</label>
-                    <div className="space-y-2 max-h-32 overflow-y-auto border border-white/30 rounded-lg p-2 bg-white/50 backdrop-blur-sm">
-                      {pages.map(page => (
-                        <label key={page} className="flex items-center space-x-2 p-2 hover:bg-white/30 rounded cursor-pointer backdrop-blur-sm">
-                          <input
-                            type="checkbox"
-                            checked={selectedPages.includes(page)}
-                            onChange={e => {
-                              if (e.target.checked) {
-                                setSelectedPages([...selectedPages, page]);
-                              } else {
-                                setSelectedPages(selectedPages.filter(p => p !== page));
-                              }
-                            }}
-                            className="rounded border-gray-300 text-orange-500 focus:ring-orange-500"
-                          />
-                          <span className="text-sm text-gray-700">{page}</span>
-                        </label>
-                      ))}
+                    <div className="relative">
+                      <select
+                        multiple
+                        value={selectedPages}
+                        onChange={e => {
+                          const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
+                          setSelectedPages(selectedOptions);
+                        }}
+                        className="w-full p-3 border border-white/30 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 appearance-none bg-white/70 backdrop-blur-sm min-h-24"
+                      >
+                        {pages.map(page => (
+                          <option key={page} value={page}>{page}</option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-3 top-3 w-5 h-5 text-gray-400" />
                     </div>
                     <div className="flex items-center space-x-2 mt-2">
                       <input
@@ -648,7 +642,7 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                                           <div className="flex items-center space-x-2 mb-2"><Icon className="w-4 h-4" /><span className="font-semibold">{tab.label}</span></div>
                                           <div className="bg-white/70 backdrop-blur-sm rounded-lg p-4 border border-white/20">
                                             <h5 className="font-semibold text-gray-800 mb-3">AI Summary</h5>
-                                            <p className="text-gray-700 mb-2">{video.summary || tab.content}</p>
+                                            <p className="text-gray-700 mb-2">{video.summary || tab.content || 'No summary available'}</p>
                                             {video.quotes && video.quotes.length > 0 && (
                                               <div className="mb-2">
                                                 <h5 className="font-semibold text-gray-800 mb-1">Key Quotes</h5>
@@ -664,6 +658,9 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                                                   {video.timestamps.map((t, i) => <li key={i} className="text-gray-700">{t}</li>)}
                                                 </ul>
                                               </div>
+                                            )}
+                                            {(!video.summary && !video.quotes && !video.timestamps) && (
+                                              <p className="text-gray-500 italic">No video content available for this page.</p>
                                             )}
                                           </div>
                                         </div>
@@ -792,17 +789,27 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
                                 icon = Video;
                                 // Run video summarizer for each selected page
                                 for (const page of selectedPages) {
-                                  const result = await apiService.videoSummarizer({
-                                    space_key: selectedSpace,
-                                    page_title: page,
-                                    question: goal
-                                  });
-                                  const content = {
-                                    summary: result.summary,
-                                    quotes: result.quotes || [],
-                                    timestamps: result.timestamps || []
-                                  };
-                                  results.push({ id: `${feature}-${page}`, label, icon, content, page: page.trim(), type: 'video' });
+                                  try {
+                                    const result = await apiService.videoSummarizer({
+                                      space_key: selectedSpace,
+                                      page_title: page,
+                                      question: goal
+                                    });
+                                    const content = {
+                                      summary: result.summary || 'No summary available',
+                                      quotes: result.quotes || [],
+                                      timestamps: result.timestamps || []
+                                    };
+                                    results.push({ id: `${feature}-${page}`, label, icon, content, page: page.trim(), type: 'video' });
+                                  } catch (err) {
+                                    console.error('Video summarizer error:', err);
+                                    const content = {
+                                      summary: 'Error processing video content. Please check if the page contains video content.',
+                                      quotes: [],
+                                      timestamps: []
+                                    };
+                                    results.push({ id: `${feature}-${page}`, label, icon, content, page: page.trim(), type: 'video' });
+                                  }
                                 }
                               } else if (feature === 'impact') {
                                 label = 'Impact Analyzer';
