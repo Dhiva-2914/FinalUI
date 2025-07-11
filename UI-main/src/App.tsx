@@ -75,7 +75,7 @@ function App() {
           {!appMode ? (
             <ModeSelector onModeSelect={handleModeSelect} onClose={handleAppClose} />
           ) : appMode === 'agent' ? (
-            <AgentMode onClose={handleAppClose} onModeSelect={setAppMode} />
+            <AgentMode onClose={handleAppClose} onModeSelect={setAppMode} autoSpaceKey={autoSpaceKey} isSpaceAutoConnected={!!autoSpaceKey} />
           ) : appMode === 'tool' && activeFeature ? (
             renderActiveFeature()
           ) : appMode === 'tool' ? (

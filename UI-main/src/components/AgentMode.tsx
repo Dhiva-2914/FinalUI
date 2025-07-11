@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Zap, X, Send, Download, RotateCcw, FileText, Brain, CheckCircle, Loader2, MessageSquare, Plus } from 'lucide-react';
 import type { AppMode } from '../App';
 
 interface AgentModeProps {
   onClose: () => void;
   onModeSelect: (mode: AppMode) => void;
+  autoSpaceKey?: string | null;
+  isSpaceAutoConnected?: boolean;
 }
 
 interface PlanStep {
@@ -21,7 +23,7 @@ interface OutputTab {
   content: string;
 }
 
-const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
+const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect, autoSpaceKey, isSpaceAutoConnected }) => {
   const [goal, setGoal] = useState('');
   const [isPlanning, setIsPlanning] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
@@ -31,6 +33,52 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
   const [followUpQuestion, setFollowUpQuestion] = useState('');
   const [showFollowUp, setShowFollowUp] = useState(false);
   const [outputTabs, setOutputTabs] = useState<OutputTab[]>([]);
+  const [selectedSpace, setSelectedSpace] = useState('');
+  const [selectedPages, setSelectedPages] = useState<string[]>([]);
+  const [spaces, setSpaces] = useState<any[]>([]);
+  const [pages, setPages] = useState<string[]>([]);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    loadSpaces();
+  }, []);
+
+  useEffect(() => {
+    if (autoSpaceKey && isSpaceAutoConnected) {
+      setSelectedSpace(autoSpaceKey);
+    }
+  }, [autoSpaceKey, isSpaceAutoConnected]);
+
+  useEffect(() => {
+    if (selectedSpace) {
+      loadPages();
+    }
+  }, [selectedSpace]);
+
+  const loadSpaces = async () => {
+    try {
+      setError('');
+      // TODO: Replace with actual API call
+      // const result = await apiService.getSpaces();
+      // setSpaces(result.spaces);
+    } catch (err) {
+      setError('Failed to load spaces. Please check your backend connection.');
+      console.error('Error loading spaces:', err);
+    }
+  };
+
+  const loadPages = async () => {
+    try {
+      setError('');
+      // TODO: Replace with actual API call
+      // const result = await apiService.getPages(selectedSpace);
+      // setPages(result.pages);
+      setSelectedPages([]); // Reset selected pages when space changes
+    } catch (err) {
+      setError('Failed to load pages. Please check your space key.');
+      console.error('Error loading pages:', err);
+    }
+  };
 
   const handleGoalSubmit = async () => {
     if (!goal.trim()) return;
