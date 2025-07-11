@@ -517,304 +517,251 @@ ${outputTabs.find(tab => tab.id === 'tools')?.content || ''}
             </div>
           )}
 
-          {/* The rest of Agent Mode UI (goal input, planning, execution, etc.) should only show after space/page selection is complete */}
-          {showSpacePageSelection && (
-            <div className="max-w-4xl mx-auto">
-              {/* Space/Page selection UI */}
-              <div className="bg-white/60 backdrop-blur-xl rounded-xl p-8 border border-white/20 shadow-lg text-center mb-8">
-                <h3 className="text-xl font-bold text-gray-800 mb-4">Select Space and Pages</h3>
-                {error && <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg">{error}</div>}
-                {/* Space Selection */}
-                <div className="mb-4 text-left">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Select Confluence Space</label>
-                <div className="relative">
-                    <select
-                      value={selectedSpace}
-                      onChange={e => setSelectedSpace(e.target.value)}
-                      className="w-full p-3 border border-white/30 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 appearance-none bg-white/70 backdrop-blur-sm"
-                    >
-                      <option value="">Choose a space...</option>
-                      {spaces.map(space => (
-                        <option key={space.key} value={space.key}>{space.name} ({space.key})</option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  </div>
-                </div>
-                {/* Page Selection */}
-                <div className="mb-4 text-left">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Select Pages to Analyze</label>
-                  <div className="space-y-2 max-h-40 overflow-y-auto border border-white/30 rounded-lg p-2 bg-white/50 backdrop-blur-sm">
-                    {pages.map(page => (
-                      <label key={page} className="flex items-center space-x-2 p-2 hover:bg-white/30 rounded cursor-pointer backdrop-blur-sm">
-                        <input
-                          type="checkbox"
-                          checked={selectedPages.includes(page)}
-                          onChange={e => {
-                            if (e.target.checked) {
-                              setSelectedPages([...selectedPages, page]);
+          {/* Chat and Used Tools Layout - Only show after space/page selection is complete */}
+          {showSpacePageSelection && selectedSpace && selectedPages.length > 0 && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Left Column - Used Tools */}
+              <div className="bg-white/80 backdrop-blur-xl rounded-xl p-6 border border-white/20 shadow-lg">
+                <h3 className="text-xl font-bold text-gray-800 mb-4">Used Tools</h3>
+                {outputTabs.length > 0 ? (
+                  <div className="space-y-6">
+                    {selectedPages.map(page => (
+                      <div key={page} className="bg-white/90 rounded-lg p-4 border border-orange-100">
+                        <h5 className="text-md font-bold mb-2 text-orange-700">Page: {page}</h5>
+                        <div className="space-y-4">
+                          {outputTabs.filter(tab => tab.page === page).map(tab => {
+                            const Icon = tab.icon;
+                            // Render by feature type
+                            if (tab.type === 'code') {
+                              return (
+                                <div key={tab.id} className="mb-4">
+                                  <div className="flex items-center space-x-2 mb-2"><Icon className="w-4 h-4" /><span className="font-semibold">{tab.label}</span></div>
+                                  <div className="bg-gray-900/90 backdrop-blur-sm rounded-lg p-4 overflow-auto max-h-96 border border-white/10">
+                                    <pre className="text-sm text-gray-300"><code>{tab.content}</code></pre>
+                                  </div>
+                                </div>
+                              );
+                            } else if (tab.type === 'diff') {
+                              return (
+                                <div key={tab.id} className="mb-4">
+                                  <div className="flex items-center space-x-2 mb-2"><Icon className="w-4 h-4" /><span className="font-semibold">{tab.label}</span></div>
+                                  <div className="bg-gray-900/90 backdrop-blur-sm rounded-lg p-4 overflow-auto max-h-80 border border-white/10">
+                                    <pre className="text-sm">
+                                      <code>
+                                        {tab.content.split('\n').map((line, idx) => (
+                                          <div key={idx} className={
+                                            line.startsWith('+') ? 'text-green-400' :
+                                            line.startsWith('-') ? 'text-red-400' :
+                                            line.startsWith('@@') ? 'text-blue-400' :
+                                            'text-gray-300'}>{line}</div>
+                                        ))}
+                                      </code>
+                                    </pre>
+                                  </div>
+                                </div>
+                              );
+                            } else if (tab.type === 'summary') {
+                              return (
+                                <div key={tab.id} className="mb-4">
+                                  <div className="flex items-center space-x-2 mb-2"><Icon className="w-4 h-4" /><span className="font-semibold">{tab.label}</span></div>
+                                  <div className="bg-white/70 backdrop-blur-sm rounded-lg p-4 border border-white/20 prose prose-sm max-w-none">
+                                    {tab.content.split('\n').map((line, idx) => <p key={idx} className="text-gray-700 mb-1">{line}</p>)}
+                                  </div>
+                                </div>
+                              );
+                            } else if (tab.type === 'video') {
+                              // Assume tab.content is an object with summary, quotes, timestamps
+                              const video = tab.content;
+                              return (
+                                <div key={tab.id} className="mb-4">
+                                  <div className="flex items-center space-x-2 mb-2"><Icon className="w-4 h-4" /><span className="font-semibold">{tab.label}</span></div>
+                                  <div className="bg-white/70 backdrop-blur-sm rounded-lg p-4 border border-white/20">
+                                    <h5 className="font-semibold text-gray-800 mb-3">AI Summary</h5>
+                                    <p className="text-gray-700 mb-2">{video.summary}</p>
+                                    {video.quotes && video.quotes.length > 0 && (
+                                      <div className="mb-2">
+                                        <h5 className="font-semibold text-gray-800 mb-1">Key Quotes</h5>
+                                        <ul className="list-disc ml-6">
+                                          {video.quotes.map((q, i) => <li key={i} className="italic text-gray-700">"{q}"</li>)}
+                                        </ul>
+                                      </div>
+                                    )}
+                                    {video.timestamps && video.timestamps.length > 0 && (
+                                      <div className="mb-2">
+                                        <h5 className="font-semibold text-gray-800 mb-1">Timestamps</h5>
+                                        <ul className="list-disc ml-6">
+                                          {video.timestamps.map((t, i) => <li key={i} className="text-gray-700">{t}</li>)}
+                                        </ul>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            } else if (tab.type === 'image') {
+                              // Placeholder for image/chart rendering
+                              return (
+                                <div key={tab.id} className="mb-4">
+                                  <div className="flex items-center space-x-2 mb-2"><Icon className="w-4 h-4" /><span className="font-semibold">{tab.label}</span></div>
+                                  <div className="bg-white/70 backdrop-blur-sm rounded-lg p-4 border border-white/20 text-gray-700">[Image analysis and chart would be shown here]</div>
+                                </div>
+                              );
                             } else {
-                              setSelectedPages(selectedPages.filter(p => p !== page));
+                              // Default: plain text
+                              return (
+                                <div key={tab.id} className="mb-4">
+                                  <div className="flex items-center space-x-2 mb-2"><Icon className="w-4 h-4" /><span className="font-semibold">{tab.label}</span></div>
+                                  <div className="bg-white/70 backdrop-blur-sm rounded-lg p-4 border border-white/20 text-gray-700 whitespace-pre-line">{tab.content}</div>
+                                </div>
+                              );
                             }
-                          }}
-                          className="rounded border-gray-300 text-orange-500 focus:ring-orange-500"
-                        />
-                        <span className="text-sm text-gray-700">{page}</span>
-                      </label>
-                    ))}
-                  </div>
-                  <p className="text-sm text-gray-500 mt-1">{selectedPages.length} page(s) selected</p>
-                </div>
-                <div className="flex items-center space-x-2 mb-2">
-                  <input
-                    type="checkbox"
-                    checked={selectAllPages}
-                    onChange={toggleSelectAllPages}
-                    className="rounded border-gray-300 text-orange-500 focus:ring-orange-500"
-                  />
-                  <span className="text-sm text-gray-700 font-medium">Select All Pages</span>
-                </div>
-              </div>
-
-              {/* Chat area appears after at least one page is selected */}
-              {selectedSpace && selectedPages.length > 0 && (
-                <div className="bg-white/80 backdrop-blur-xl rounded-xl p-8 border border-white/20 shadow-lg">
-                  <h3 className="text-xl font-bold text-gray-800 mb-4">Agent Chat</h3>
-                  {/* Chat history */}
-                  <div className="mb-6 max-h-64 overflow-y-auto flex flex-col space-y-4">
-                    {chatHistory.map((msg, idx) => (
-                      <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`px-4 py-2 rounded-lg ${msg.role === 'user' ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-800'}`}>{msg.text}</div>
+                          })}
+                        </div>
                       </div>
                     ))}
                   </div>
-                  {/* Input area */}
-                  <form
-                    onSubmit={async (e) => {
-                      e.preventDefault();
-                      if (!goal.trim()) return;
-                      setChatHistory([...chatHistory, { role: 'user', text: goal }]);
-                      setGoal('');
-                      setIsPlanning(true);
-                      setOutputTabs([]);
-                      // Feature detection and execution (same as before)
-                      const featuresToRun = [];
-                      const lowerGoal = goal.toLowerCase();
-                      if (/search|analyz|summariz|find|explor|context/.test(lowerGoal)) featuresToRun.push('search');
-                      if (/code|convert|refactor|translate|language/.test(lowerGoal)) featuresToRun.push('code');
-                      if (/video|summariz.*video|extract.*quote/.test(lowerGoal)) featuresToRun.push('video');
-                      if (/impact|compare|diff|change|version/.test(lowerGoal)) featuresToRun.push('impact');
-                      if (/test|strategy|cross-platform|sensitivity/.test(lowerGoal)) featuresToRun.push('test');
-                      if (/image|chart|graph|visualiz/.test(lowerGoal)) featuresToRun.push('image');
-                      if (featuresToRun.length === 0) featuresToRun.push('search');
-                      setTimeout(async () => {
-                        setIsPlanning(false);
-                        setIsExecuting(true);
-                        const results = [];
-                        for (const feature of featuresToRun) {
-                          let content = '';
-                          let label = '';
-                          let icon = FileText;
-                          try {
-                            if (feature === 'search') {
-                              label = 'AI Powered Search';
-                              icon = Search;
-                              const result = await apiService.search({
-                                space_key: selectedSpace,
-                                page_titles: selectedPages,
-                                query: goal
-                              });
-                              content = result.response || 'No response.';
-                              results.push({ id: feature, label, icon, content, page: selectedPages[0], type: 'text' });
-                            } else if (feature === 'code') {
-                              label = 'Code Assistant';
-                              icon = Code;
-                              const page = selectedPages[0];
-                              const result = await apiService.codeAssistant({
-                                space_key: selectedSpace,
-                                page_title: page,
-                                instruction: goal
-                              });
-                              content = result.modified_code || result.original_code || '';
-                              results.push({ id: feature, label, icon, content, page, type: 'code' });
-                            } else if (feature === 'video') {
-                              label = 'Video Summarizer';
-                              icon = Video;
-                              const page = selectedPages[0];
-                              const result = await apiService.videoSummarizer({
-                                space_key: selectedSpace,
-                                page_title: page,
-                                question: goal
-                              });
-                              content = {
-                                summary: result.summary,
-                                quotes: result.quotes || [],
-                                timestamps: result.timestamps || []
-                              };
-                              results.push({ id: feature, label, icon, content, page, type: 'video' });
-                            } else if (feature === 'impact') {
-                              label = 'Impact Analyzer';
-                              icon = TrendingUp;
-                              const oldPage = selectedPages[0];
-                              const newPage = selectedPages[1] || selectedPages[0];
-                              const result = await apiService.impactAnalyzer({
-                                space_key: selectedSpace,
-                                old_page_title: oldPage,
-                                new_page_title: newPage,
-                                question: goal
-                              });
-                              content = result.diff || '';
-                              results.push({ id: feature, label, icon, content, page: oldPage, type: 'diff' });
-                            } else if (feature === 'test') {
-                              label = 'Test Support Tool';
-                              icon = TestTube;
-                              const codePage = selectedPages[0];
-                              const result = await apiService.testSupport({
-                                space_key: selectedSpace,
-                                code_page_title: codePage,
-                                question: goal
-                              });
-                              content = result.test_strategy || '';
-                              results.push({ id: feature, label, icon, content, page: codePage, type: 'summary' });
-                            } else if (feature === 'image') {
-                              label = 'Image Insights';
-                              icon = Image;
-                              const page = selectedPages[0];
-                              content = 'Image analysis and chart generation would be shown here.';
-                              results.push({ id: feature, label, icon, content, page, type: 'image' });
-                            }
-                          } catch (err) {
-                            content = 'Error: ' + (err.message || err.toString());
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <Zap className="w-12 h-12 mx-auto mb-2 text-gray-400" />
+                    <p>Start chatting to see results here</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Right Column - Chat */}
+              <div className="bg-white/80 backdrop-blur-xl rounded-xl p-6 border border-white/20 shadow-lg">
+                <h3 className="text-xl font-bold text-gray-800 mb-4">Agent Chat</h3>
+                {/* Chat history */}
+                <div className="mb-6 max-h-64 overflow-y-auto flex flex-col space-y-4">
+                  {chatHistory.map((msg, idx) => (
+                    <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`px-4 py-2 rounded-lg ${msg.role === 'user' ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-800'}`}>{msg.text}</div>
+                    </div>
+                  ))}
+                </div>
+                {/* Input area */}
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (!goal.trim()) return;
+                    setChatHistory([...chatHistory, { role: 'user', text: goal }]);
+                    setGoal('');
+                    setIsPlanning(true);
+                    setOutputTabs([]);
+                    // Feature detection and execution (same as before)
+                    const featuresToRun = [];
+                    const lowerGoal = goal.toLowerCase();
+                    if (/search|analyz|summariz|find|explor|context/.test(lowerGoal)) featuresToRun.push('search');
+                    if (/code|convert|refactor|translate|language/.test(lowerGoal)) featuresToRun.push('code');
+                    if (/video|summariz.*video|extract.*quote/.test(lowerGoal)) featuresToRun.push('video');
+                    if (/impact|compare|diff|change|version/.test(lowerGoal)) featuresToRun.push('impact');
+                    if (/test|strategy|cross-platform|sensitivity/.test(lowerGoal)) featuresToRun.push('test');
+                    if (/image|chart|graph|visualiz/.test(lowerGoal)) featuresToRun.push('image');
+                    if (featuresToRun.length === 0) featuresToRun.push('search');
+                    setTimeout(async () => {
+                      setIsPlanning(false);
+                      setIsExecuting(true);
+                      const results = [];
+                      for (const feature of featuresToRun) {
+                        let content = '';
+                        let label = '';
+                        let icon = FileText;
+                        try {
+                          if (feature === 'search') {
+                            label = 'AI Powered Search';
+                            icon = Search;
+                            const result = await apiService.search({
+                              space_key: selectedSpace,
+                              page_titles: selectedPages,
+                              query: goal
+                            });
+                            content = result.response || 'No response.';
+                            results.push({ id: feature, label, icon, content, page: selectedPages[0], type: 'text' });
+                          } else if (feature === 'code') {
+                            label = 'Code Assistant';
+                            icon = Code;
+                            const page = selectedPages[0];
+                            const result = await apiService.codeAssistant({
+                              space_key: selectedSpace,
+                              page_title: page,
+                              instruction: goal
+                            });
+                            content = result.modified_code || result.original_code || '';
+                            results.push({ id: feature, label, icon, content, page, type: 'code' });
+                          } else if (feature === 'video') {
+                            label = 'Video Summarizer';
+                            icon = Video;
+                            const page = selectedPages[0];
+                            const result = await apiService.videoSummarizer({
+                              space_key: selectedSpace,
+                              page_title: page,
+                              question: goal
+                            });
+                            content = {
+                              summary: result.summary,
+                              quotes: result.quotes || [],
+                              timestamps: result.timestamps || []
+                            };
+                            results.push({ id: feature, label, icon, content, page, type: 'video' });
+                          } else if (feature === 'impact') {
+                            label = 'Impact Analyzer';
+                            icon = TrendingUp;
+                            const oldPage = selectedPages[0];
+                            const newPage = selectedPages[1] || selectedPages[0];
+                            const result = await apiService.impactAnalyzer({
+                              space_key: selectedSpace,
+                              old_page_title: oldPage,
+                              new_page_title: newPage,
+                              question: goal
+                            });
+                            content = result.diff || '';
+                            results.push({ id: feature, label, icon, content, page: oldPage, type: 'diff' });
+                          } else if (feature === 'test') {
+                            label = 'Test Support Tool';
+                            icon = TestTube;
+                            const codePage = selectedPages[0];
+                            const result = await apiService.testSupport({
+                              space_key: selectedSpace,
+                              code_page_title: codePage,
+                              question: goal
+                            });
+                            content = result.test_strategy || '';
+                            results.push({ id: feature, label, icon, content, page: codePage, type: 'summary' });
+                          } else if (feature === 'image') {
+                            label = 'Image Insights';
+                            icon = Image;
+                            const page = selectedPages[0];
+                            content = 'Image analysis and chart generation would be shown here.';
+                            results.push({ id: feature, label, icon, content, page, type: 'image' });
                           }
+                        } catch (err) {
+                          content = 'Error: ' + (err.message || err.toString());
                         }
-                        setOutputTabs(results);
-                        setActiveTab(results[0]?.id || 'answer');
-                        setIsExecuting(false);
-                        setShowFollowUp(true);
-                        setChatHistory(prev => [...prev, { role: 'agent', text: 'I have processed your request. Check the Used Tools section below for the results.' }]);
-                      }, 1500);
-                    }}
-                    className="flex items-center space-x-4"
-                  >
-                    <textarea
-                      value={goal}
-                      onChange={e => setGoal(e.target.value)}
-                      placeholder="Type your instruction or question..."
-                      className="flex-1 p-3 border border-orange-200/50 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 resize-none bg-white/70 backdrop-blur-sm text-lg"
-                      rows={2}
+                      }
+                      setOutputTabs(results);
+                      setActiveTab(results[0]?.id || 'answer');
+                      setIsExecuting(false);
+                      setShowFollowUp(true);
+                      setChatHistory(prev => [...prev, { role: 'agent', text: 'I have processed your request. Check the Used Tools section for the results.' }]);
+                    }, 1500);
+                  }}
+                  className="flex items-center space-x-4"
+                >
+                  <textarea
+                    value={goal}
+                    onChange={e => setGoal(e.target.value)}
+                    placeholder="Type your instruction or question..."
+                    className="flex-1 p-3 border border-orange-200/50 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 resize-none bg-white/70 backdrop-blur-sm text-lg"
+                    rows={2}
                   />
                   <button
-                      type="submit"
+                    type="submit"
                     disabled={!goal.trim()}
-                      className="bg-orange-500/90 backdrop-blur-sm text-white p-3 rounded-lg hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center space-x-2 transition-colors border border-white/10"
+                    className="bg-orange-500/90 backdrop-blur-sm text-white p-3 rounded-lg hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center space-x-2 transition-colors border border-white/10"
                   >
                     <Send className="w-5 h-5" />
                   </button>
-                  </form>
-                  {/* Used Tools Section */}
-                  {outputTabs.length > 0 && (
-                    <div className="mt-8">
-                      <h4 className="text-lg font-semibold mb-2">Used Tools</h4>
-                      {/* Group outputs by page, then by feature */}
-                      <div className="space-y-8">
-                        {selectedPages.map(page => (
-                          <div key={page} className="bg-white/90 rounded-lg p-4 border border-orange-100">
-                            <h5 className="text-md font-bold mb-2 text-orange-700">Page: {page}</h5>
-                            <div className="space-y-4">
-                              {outputTabs.filter(tab => tab.page === page).map(tab => {
-                                const Icon = tab.icon;
-                                // Render by feature type
-                                if (tab.type === 'code') {
-                                  return (
-                                    <div key={tab.id} className="mb-4">
-                                      <div className="flex items-center space-x-2 mb-2"><Icon className="w-4 h-4" /><span className="font-semibold">{tab.label}</span></div>
-                                      <div className="bg-gray-900/90 backdrop-blur-sm rounded-lg p-4 overflow-auto max-h-96 border border-white/10">
-                                        <pre className="text-sm text-gray-300"><code>{tab.content}</code></pre>
-                                      </div>
-                                    </div>
-                                  );
-                                } else if (tab.type === 'diff') {
-                                  return (
-                                    <div key={tab.id} className="mb-4">
-                                      <div className="flex items-center space-x-2 mb-2"><Icon className="w-4 h-4" /><span className="font-semibold">{tab.label}</span></div>
-                                      <div className="bg-gray-900/90 backdrop-blur-sm rounded-lg p-4 overflow-auto max-h-80 border border-white/10">
-                                        <pre className="text-sm">
-                                          <code>
-                                            {tab.content.split('\n').map((line, idx) => (
-                                              <div key={idx} className={
-                                                line.startsWith('+') ? 'text-green-400' :
-                                                line.startsWith('-') ? 'text-red-400' :
-                                                line.startsWith('@@') ? 'text-blue-400' :
-                                                'text-gray-300'}>{line}</div>
-                                            ))}
-                                          </code>
-                                        </pre>
-                                      </div>
-                                    </div>
-                                  );
-                                } else if (tab.type === 'summary') {
-                                  return (
-                                    <div key={tab.id} className="mb-4">
-                                      <div className="flex items-center space-x-2 mb-2"><Icon className="w-4 h-4" /><span className="font-semibold">{tab.label}</span></div>
-                                      <div className="bg-white/70 backdrop-blur-sm rounded-lg p-4 border border-white/20 prose prose-sm max-w-none">
-                                        {tab.content.split('\n').map((line, idx) => <p key={idx} className="text-gray-700 mb-1">{line}</p>)}
-                                      </div>
-                                    </div>
-                                  );
-                                } else if (tab.type === 'video') {
-                                  // Assume tab.content is an object with summary, quotes, timestamps
-                                  const video = tab.content;
-                                  return (
-                                    <div key={tab.id} className="mb-4">
-                                      <div className="flex items-center space-x-2 mb-2"><Icon className="w-4 h-4" /><span className="font-semibold">{tab.label}</span></div>
-                                      <div className="bg-white/70 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-                                        <h5 className="font-semibold text-gray-800 mb-3">AI Summary</h5>
-                                        <p className="text-gray-700 mb-2">{video.summary}</p>
-                                        {video.quotes && video.quotes.length > 0 && (
-                                          <div className="mb-2">
-                                            <h5 className="font-semibold text-gray-800 mb-1">Key Quotes</h5>
-                                            <ul className="list-disc ml-6">
-                                              {video.quotes.map((q, i) => <li key={i} className="italic text-gray-700">"{q}"</li>)}
-                                            </ul>
-                                          </div>
-                                        )}
-                                        {video.timestamps && video.timestamps.length > 0 && (
-                                          <div className="mb-2">
-                                            <h5 className="font-semibold text-gray-800 mb-1">Timestamps</h5>
-                                            <ul className="list-disc ml-6">
-                                              {video.timestamps.map((t, i) => <li key={i} className="text-gray-700">{t}</li>)}
-                                            </ul>
-                                          </div>
-                                        )}
-                                      </div>
-                                    </div>
-                                  );
-                                } else if (tab.type === 'image') {
-                                  // Placeholder for image/chart rendering
-                                  return (
-                                    <div key={tab.id} className="mb-4">
-                                      <div className="flex items-center space-x-2 mb-2"><Icon className="w-4 h-4" /><span className="font-semibold">{tab.label}</span></div>
-                                      <div className="bg-white/70 backdrop-blur-sm rounded-lg p-4 border border-white/20 text-gray-700">[Image analysis and chart would be shown here]</div>
-                                    </div>
-                                  );
-                                } else {
-                                  // Default: plain text
-                                  return (
-                                    <div key={tab.id} className="mb-4">
-                                      <div className="flex items-center space-x-2 mb-2"><Icon className="w-4 h-4" /><span className="font-semibold">{tab.label}</span></div>
-                                      <div className="bg-white/70 backdrop-blur-sm rounded-lg p-4 border border-white/20 text-gray-700 whitespace-pre-line">{tab.content}</div>
-                                    </div>
-                                  );
-                                }
-                              })}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
+                </form>
+              </div>
             </div>
           )}
 
