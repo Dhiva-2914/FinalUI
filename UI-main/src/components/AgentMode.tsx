@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Select from 'react-select';
-import { Zap, X, Send, Download, RotateCcw, FileText, Brain, CheckCircle, Loader2, MessageSquare, Plus } from 'lucide-react';
+import { Zap, X, Send, Download, RotateCcw, FileText, Brain, CheckCircle, Loader2, MessageSquare, Plus, LayoutSidebar } from 'lucide-react';
 import type { AppMode } from '../App';
 import { apiService, analyzeGoal } from '../services/api';
 
@@ -42,6 +42,9 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
   const [error, setError] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // Chat input for instructions at any time
+  const [chatInput, setChatInput] = useState('');
+
   // Open sidebar when results are displayed
   useEffect(() => {
     if (planSteps.length > 0) setSidebarOpen(true);
@@ -75,8 +78,21 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
     }
   }, [selectedSpace]);
 
-  const handleGoalSubmit = async () => {
-    if (!goal.trim() || !selectedSpace || selectedPages.length === 0) {
+  // Unified handler for chat input (before and after results)
+  const handleChatSubmit = async () => {
+    if (!chatInput.trim() || !selectedSpace || !selectedPages.length) {
+      setError('Please enter an instruction, select a space, and at least one page.');
+      return;
+    }
+    setGoal(chatInput); // Set as goal for consistency
+    setChatInput('');
+    await handleGoalSubmit(chatInput); // Pass chatInput as goal
+  };
+
+  // Modified handleGoalSubmit to accept optional goal override
+  const handleGoalSubmit = async (goalOverride?: string) => {
+    const usedGoal = goalOverride !== undefined ? goalOverride : goal;
+    if (!usedGoal.trim() || !selectedSpace || selectedPages.length === 0) {
       setError('Please enter a goal, select a space, and at least one page.');
       return;
     }
@@ -92,49 +108,42 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
     let toolsToUse: string[] = [];
     let orchestrationReasoning = '';
     try {
-      // Step 1: Use Gemini to analyze the goal and get tools
       setPlanSteps((steps) => steps.map((s) => s.id === 1 ? { ...s, status: 'running' } : s));
       setCurrentStep(0);
-      const analysis = await analyzeGoal(goal, selectedPages); // Only pass user-selected pages
+      const analysis = await analyzeGoal(usedGoal, selectedPages);
       toolsToUse = analysis.tools || [];
       let selectedPagesFromAI = analysis.pages || [];
-      // Only allow pages that the user selected
       selectedPagesFromAI = selectedPagesFromAI.filter((p: string) => selectedPages.includes(p));
       orchestrationReasoning = analysis.reasoning || '';
       setPlanSteps((steps) => steps.map((s) => s.id === 1 ? { ...s, status: 'completed' } : s));
       setCurrentStep(1);
-      // Step 2: Call the selected tools on the selected pages from AI
       setPlanSteps((steps) => steps.map((s) => s.id === 2 ? { ...s, status: 'running' } : s));
       const toolResults: Record<string, any> = {};
-      // AI Powered Search
       if (toolsToUse.includes('ai_powered_search')) {
         const res = await apiService.search({
           space_key: selectedSpace,
           page_titles: selectedPagesFromAI,
-          query: goal,
+          query: usedGoal,
         });
         toolResults['AI Powered Search'] = res;
       }
-      // Impact Analyzer (requires at least 2 pages)
       if (toolsToUse.includes('impact_analyzer') && selectedPagesFromAI.length >= 2) {
         const res = await apiService.impactAnalyzer({
           space_key: selectedSpace,
           old_page_title: selectedPagesFromAI[0],
           new_page_title: selectedPagesFromAI[1],
-          question: goal,
+          question: usedGoal,
         });
         toolResults['Impact Analyzer'] = res;
       }
-      // Code Assistant
       if (toolsToUse.includes('code_assistant') && selectedPagesFromAI.length > 0) {
         const res = await apiService.codeAssistant({
           space_key: selectedSpace,
           page_title: selectedPagesFromAI[0],
-          instruction: goal,
+          instruction: usedGoal,
         });
         toolResults['Code Assistant'] = res;
       }
-      // Video Summarizer
       if (toolsToUse.includes('video_summarizer') && selectedPagesFromAI.length > 0) {
         const res = await apiService.videoSummarizer({
           space_key: selectedSpace,
@@ -142,7 +151,6 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
         });
         toolResults['Video Summarizer'] = res;
       }
-      // Test Support
       if (toolsToUse.includes('test_support') && selectedPagesFromAI.length > 0) {
         const res = await apiService.testSupport({
           space_key: selectedSpace,
@@ -150,7 +158,6 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
         });
         toolResults['Test Support'] = res;
       }
-      // Image Insights
       if (toolsToUse.includes('image_insights') && selectedPagesFromAI.length > 0) {
         const images = await apiService.getImages(selectedSpace, selectedPagesFromAI[0]);
         if (images && images.images && images.images.length > 0) {
@@ -162,7 +169,6 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
           toolResults['Image Insights'] = summaries;
         }
       }
-      // Chart Builder
       if (toolsToUse.includes('chart_builder') && selectedPagesFromAI.length > 0) {
         const images = await apiService.getImages(selectedSpace, selectedPagesFromAI[0]);
         if (images && images.images && images.images.length > 0) {
@@ -178,8 +184,7 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
         }
       }
       setPlanSteps((steps) => steps.map((s) => s.id === 2 ? { ...s, status: 'completed' } : s));
-      setCurrentStep(planSteps.length - 1); // Ensure progress is 100% when done
-      // Prepare output tabs
+      setCurrentStep(planSteps.length - 1);
       const getRelevantOutput = (result: any) => {
         if (!result) return '';
         if (typeof result === 'string') return result;
@@ -438,329 +443,328 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
 
   return (
     <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-40 p-4">
-      <div className="bg-white/80 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-row">
-        {/* Sidebar */}
-        {planSteps.length > 0 && sidebarOpen && (
-          <div className="w-full max-w-xs bg-white/90 border-r border-white/20 flex flex-col p-4 space-y-6 relative z-10">
-            <button
-              className="absolute top-2 right-2 text-gray-400 hover:text-orange-500"
-              onClick={() => setSidebarOpen(false)}
-              title="Close sidebar"
-            >
-              <X className="w-6 h-6" />
-            </button>
-            {/* Space and Page Selectors */}
-            <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg">
-              <h3 className="text-lg font-bold text-gray-800 mb-4">Select Space and Pages</h3>
-              <div className="mb-4">
-                <label className="block text-gray-700 mb-2 text-left">Space</label>
-                <Select
-                  classNamePrefix="react-select"
-                  options={spaces.map(space => ({ value: space.key, label: `${space.name} (${space.key})` }))}
-                  value={spaces.find(s => s.key === selectedSpace) ? { value: selectedSpace, label: `${spaces.find(s => s.key === selectedSpace)?.name} (${selectedSpace})` } : null}
-                  onChange={option => {
-                    setSelectedSpace(option ? option.value : '');
-                    setSelectedPages([]);
-                  }}
-                  placeholder="Select a space..."
-                  isClearable
-                />
-              </div>
+      <div className="bg-white/80 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-orange-500/90 to-orange-600/90 backdrop-blur-xl p-6 text-white border-b border-orange-300/20">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <Zap className="w-8 h-8" />
               <div>
-                <label className="block text-gray-700 mb-2 text-left">Pages</label>
-                <Select
-                  classNamePrefix="react-select"
-                  isMulti
-                  isSearchable
-                  isDisabled={!selectedSpace}
-                  options={pages.map(page => ({ value: page, label: page }))}
-                  value={selectedPages.map(page => ({ value: page, label: page }))}
-                  onChange={options => setSelectedPages(options ? options.map(opt => opt.value) : [])}
-                  placeholder={selectedSpace ? "Type or select pages..." : "Select a space first"}
-                  closeMenuOnSelect={false}
-                />
-                <div className="text-xs text-gray-500 mt-1 text-left">Type to search and select multiple pages.</div>
+                <h2 className="text-2xl font-bold">Agent Mode</h2>
+                <p className="text-orange-100/90">Goal-based AI assistance with planning and execution</p>
               </div>
-              {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
             </div>
-            {/* Chat Section */}
-            <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg mb-4">
-              <h3 className="font-semibold text-gray-800 mb-2 flex items-center"><MessageSquare className="w-5 h-5 mr-2 text-orange-500" /> Chat</h3>
-              <div className="prose prose-sm max-w-none mb-2 whitespace-pre-wrap text-gray-700">
-                {outputTabs.find(tab => tab.id === 'qa')?.content || 'Ask a follow-up question to start the chat.'}
+            <div className="flex items-center space-x-2">
+              <button 
+                onClick={() => onModeSelect('tool')}
+                className="text-orange-100 hover:text-white hover:bg-white/10 rounded-lg px-3 py-1 text-sm transition-colors"
+              >
+                Switch to Tool Mode
+              </button>
+              <button onClick={onClose} className="text-white hover:bg-white/10 rounded-full p-2 backdrop-blur-sm">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-1 min-h-0">
+          {/* Sidebar */}
+          {sidebarOpen && (
+            <div className="w-full max-w-xs bg-white/90 border-r border-white/20 flex flex-col p-4 space-y-6 relative z-10 h-full">
+              <button
+                className="absolute left-0 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-orange-500 bg-white rounded-r-lg px-2 py-1 shadow-lg"
+                onClick={() => setSidebarOpen(false)}
+                title="Close sidebar"
+                style={{ zIndex: 20 }}
+              >
+                <LayoutSidebar className="w-6 h-6" />
+              </button>
+              {/* Space and Page Selectors */}
+              <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg">
+                <h3 className="text-lg font-bold text-gray-800 mb-4">Select Space and Pages</h3>
+                <div className="mb-4">
+                  <label className="block text-gray-700 mb-2 text-left">Space</label>
+                  <Select
+                    classNamePrefix="react-select"
+                    options={spaces.map(space => ({ value: space.key, label: `${space.name} (${space.key})` }))}
+                    value={spaces.find(s => s.key === selectedSpace) ? { value: selectedSpace, label: `${spaces.find(s => s.key === selectedSpace)?.name} (${selectedSpace})` } : null}
+                    onChange={option => {
+                      setSelectedSpace(option ? option.value : '');
+                      setSelectedPages([]);
+                    }}
+                    placeholder="Select a space..."
+                    isClearable
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-700 mb-2 text-left">Pages</label>
+                  <Select
+                    classNamePrefix="react-select"
+                    isMulti
+                    isSearchable
+                    isDisabled={!selectedSpace}
+                    options={pages.map(page => ({ value: page, label: page }))}
+                    value={selectedPages.map(page => ({ value: page, label: page }))}
+                    onChange={options => setSelectedPages(options ? options.map(opt => opt.value) : [])}
+                    placeholder={selectedSpace ? "Type or select pages..." : "Select a space first"}
+                    closeMenuOnSelect={false}
+                  />
+                  <div className="text-xs text-gray-500 mt-1 text-left">Type to search and select multiple pages.</div>
+                </div>
+                {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
               </div>
-              {showFollowUp && (
-                <div className="border-t border-white/20 pt-2 mt-2">
-                  <div className="flex space-x-2">
-                    <input
-                      type="text"
-                      value={followUpQuestion}
-                      onChange={(e) => setFollowUpQuestion(e.target.value)}
-                      placeholder="Ask a follow-up question..."
-                      className="flex-1 p-2 border border-white/30 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white/70 backdrop-blur-sm"
-                      onKeyPress={(e) => e.key === 'Enter' && handleFollowUp()}
+              {/* Chat Section - always present */}
+              <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg mb-4">
+                <h3 className="font-semibold text-gray-800 mb-2 flex items-center"><MessageSquare className="w-5 h-5 mr-2 text-orange-500" /> Chat</h3>
+                <div className="mb-2">
+                  <input
+                    type="text"
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    placeholder="Type your instruction..."
+                    className="w-full p-2 border border-white/30 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white/70 backdrop-blur-sm mb-2"
+                    onKeyPress={(e) => e.key === 'Enter' && handleChatSubmit()}
+                  />
+                  <button
+                    onClick={handleChatSubmit}
+                    disabled={!chatInput.trim() || !selectedSpace || !selectedPages.length}
+                    className="w-full px-3 py-2 bg-orange-500/90 backdrop-blur-sm text-white rounded-lg hover:bg-orange-600 disabled:bg-gray-300 transition-colors flex items-center justify-center border border-white/10"
+                  >
+                    <Send className="w-4 h-4 mr-2" /> Send
+                  </button>
+                </div>
+                <div className="prose prose-sm max-w-none whitespace-pre-wrap text-gray-700">
+                  {outputTabs.find(tab => tab.id === 'qa')?.content || 'Ask a follow-up question to start the chat.'}
+                </div>
+              </div>
+              {/* Progress Timeline */}
+              <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg">
+                <h3 className="font-semibold text-gray-800 mb-4">Live Progress Log</h3>
+                <div className="space-y-4">
+                  {planSteps.map((step, index) => (
+                    <div key={step.id} className="flex items-start space-x-3">
+                      <div className="flex-shrink-0 mt-1">
+                        {step.status === 'completed' ? (
+                          <CheckCircle className="w-5 h-5 text-green-500" />
+                        ) : step.status === 'running' ? (
+                          <Loader2 className="w-5 h-5 text-orange-500 animate-spin" />
+                        ) : (
+                          <div className="w-5 h-5 border-2 border-gray-300 rounded-full" />
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-medium text-gray-800">{step.title}</div>
+                        {step.details && (
+                          <div className="text-sm text-gray-600 mt-1">{step.details}</div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {/* Progress Bar */}
+                <div className="mt-6">
+                  <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
+                    <span>Progress</span>
+                    <span>{progressPercent}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-orange-500 h-2 rounded-full transition-all duration-500"
+                      style={{ width: `${progressPercent}%` }}
                     />
-                    <button
-                      onClick={handleFollowUp}
-                      disabled={!followUpQuestion.trim() || !selectedSpace || !selectedPages.length}
-                      className="px-3 py-2 bg-orange-500/90 backdrop-blur-sm text-white rounded-lg hover:bg-orange-600 disabled:bg-gray-300 transition-colors flex items-center border border-white/10"
-                    >
-                      <Plus className="w-4 h-4" />
-                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          {/* Sidebar closed, show open button if results are present */}
+          {!sidebarOpen && (
+            <button
+              className="absolute left-0 top-1/2 transform -translate-y-1/2 bg-orange-500 text-white rounded-r-lg px-2 py-1 z-20 shadow-lg hover:bg-orange-600"
+              onClick={() => setSidebarOpen(true)}
+              title="Open sidebar"
+            >
+              <LayoutSidebar className="w-5 h-5" />
+            </button>
+          )}
+          {/* Main Content */}
+          <div className="flex-1 flex flex-col min-h-0">
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)] flex-1">
+              {/* Before results: selectors and goal input as before */}
+              {planSteps.length === 0 && !isPlanning && (
+                <div className="max-w-4xl mx-auto mb-6 sticky top-0 z-30">
+                  <div className="bg-white/60 backdrop-blur-xl rounded-xl p-6 border border-white/20 shadow-lg text-center">
+                    <h3 className="text-xl font-bold text-gray-800 mb-4">Select Space and Pages</h3>
+                    <div className="flex flex-col md:flex-row md:space-x-4 items-center justify-center mb-4">
+                      <div className="mb-4 md:mb-0 w-full md:w-1/2">
+                        <label className="block text-gray-700 mb-2 text-left">Space</label>
+                        <Select
+                          classNamePrefix="react-select"
+                          options={spaces.map(space => ({ value: space.key, label: `${space.name} (${space.key})` }))}
+                          value={spaces.find(s => s.key === selectedSpace) ? { value: selectedSpace, label: `${spaces.find(s => s.key === selectedSpace)?.name} (${selectedSpace})` } : null}
+                          onChange={option => {
+                            setSelectedSpace(option ? option.value : '');
+                            setSelectedPages([]);
+                          }}
+                          placeholder="Select a space..."
+                          isClearable
+                        />
+                      </div>
+                      <div className="w-full md:w-1/2">
+                        <label className="block text-gray-700 mb-2 text-left">Pages</label>
+                        <Select
+                          classNamePrefix="react-select"
+                          isMulti
+                          isSearchable
+                          isDisabled={!selectedSpace}
+                          options={pages.map(page => ({ value: page, label: page }))}
+                          value={selectedPages.map(page => ({ value: page, label: page }))}
+                          onChange={options => setSelectedPages(options ? options.map(opt => opt.value) : [])}
+                          placeholder={selectedSpace ? "Type or select pages..." : "Select a space first"}
+                          closeMenuOnSelect={false}
+                        />
+                        <div className="text-xs text-gray-500 mt-1 text-left">Type to search and select multiple pages.</div>
+                      </div>
+                    </div>
+                    {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
                   </div>
                 </div>
               )}
-            </div>
-            {/* Progress Timeline */}
-            <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg">
-              <h3 className="font-semibold text-gray-800 mb-4">Live Progress Log</h3>
-              <div className="space-y-4">
-                {planSteps.map((step, index) => (
-                  <div key={step.id} className="flex items-start space-x-3">
-                    <div className="flex-shrink-0 mt-1">
-                      {step.status === 'completed' ? (
-                        <CheckCircle className="w-5 h-5 text-green-500" />
-                      ) : step.status === 'running' ? (
-                        <Loader2 className="w-5 h-5 text-orange-500 animate-spin" />
-                      ) : (
-                        <div className="w-5 h-5 border-2 border-gray-300 rounded-full" />
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <div className="font-medium text-gray-800">{step.title}</div>
-                      {step.details && (
-                        <div className="text-sm text-gray-600 mt-1">{step.details}</div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              {/* Progress Bar */}
-              <div className="mt-6">
-                <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
-                  <span>Progress</span>
-                  <span>{progressPercent}%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div 
-                    className="bg-orange-500 h-2 rounded-full transition-all duration-500"
-                    style={{ width: `${progressPercent}%` }}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-        {/* Sidebar closed, show open button if results are present */}
-        {planSteps.length > 0 && !sidebarOpen && (
-          <button
-            className="absolute left-0 top-1/2 transform -translate-y-1/2 bg-orange-500 text-white rounded-r-lg px-2 py-1 z-20 shadow-lg hover:bg-orange-600"
-            onClick={() => setSidebarOpen(true)}
-            title="Open sidebar"
-          >
-            <MessageSquare className="w-5 h-5" />
-          </button>
-        )}
-        {/* Main Content */}
-        <div className="flex-1 flex flex-col">
-          {/* Header */}
-          <div className="bg-gradient-to-r from-orange-500/90 to-orange-600/90 backdrop-blur-xl p-6 text-white border-b border-orange-300/20">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <Zap className="w-8 h-8" />
-                <div>
-                  <h2 className="text-2xl font-bold">Agent Mode</h2>
-                  <p className="text-orange-100/90">Goal-based AI assistance with planning and execution</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <button 
-                  onClick={() => onModeSelect('tool')}
-                  className="text-orange-100 hover:text-white hover:bg-white/10 rounded-lg px-3 py-1 text-sm transition-colors"
-                >
-                  Switch to Tool Mode
-                </button>
-                <button onClick={onClose} className="text-white hover:bg-white/10 rounded-full p-2 backdrop-blur-sm">
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-            </div>
-          </div>
-          <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
-            {/* Before results: selectors and goal input as before */}
-            {planSteps.length === 0 && !isPlanning && (
-              <div className="max-w-4xl mx-auto mb-6 sticky top-0 z-30">
-                <div className="bg-white/60 backdrop-blur-xl rounded-xl p-6 border border-white/20 shadow-lg text-center">
-                  <h3 className="text-xl font-bold text-gray-800 mb-4">Select Space and Pages</h3>
-                  <div className="flex flex-col md:flex-row md:space-x-4 items-center justify-center mb-4">
-                    <div className="mb-4 md:mb-0 w-full md:w-1/2">
-                      <label className="block text-gray-700 mb-2 text-left">Space</label>
-                      <Select
-                        classNamePrefix="react-select"
-                        options={spaces.map(space => ({ value: space.key, label: `${space.name} (${space.key})` }))}
-                        value={spaces.find(s => s.key === selectedSpace) ? { value: selectedSpace, label: `${spaces.find(s => s.key === selectedSpace)?.name} (${selectedSpace})` } : null}
-                        onChange={option => {
-                          setSelectedSpace(option ? option.value : '');
-                          setSelectedPages([]);
-                        }}
-                        placeholder="Select a space..."
-                        isClearable
+              {/* Goal Input Section */}
+              {!planSteps.length && !isPlanning && (
+                <div className="max-w-4xl mx-auto">
+                  <div className="bg-white/60 backdrop-blur-xl rounded-xl p-8 border border-white/20 shadow-lg text-center">
+                    <h3 className="text-2xl font-bold text-gray-800 mb-6">What do you want the assistant to help you achieve?</h3>
+                    <div className="relative">
+                      <textarea
+                        value={goal}
+                        onChange={(e) => setGoal(e.target.value)}
+                        placeholder="Describe your goal in detail... (e.g., 'Help me analyze our documentation structure and recommend improvements for better user experience')"
+                        className="w-full p-4 border-2 border-orange-200/50 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 resize-none bg-white/70 backdrop-blur-sm text-lg"
+                        rows={4}
                       />
+                      <button
+                        onClick={() => handleGoalSubmit()}
+                        disabled={!goal.trim() || !selectedSpace || !selectedPages.length}
+                        className="absolute bottom-4 right-4 bg-orange-500/90 backdrop-blur-sm text-white p-3 rounded-lg hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center space-x-2 transition-colors border border-white/10"
+                      >
+                        <Send className="w-5 h-5" />
+                      </button>
                     </div>
-                    <div className="w-full md:w-1/2">
-                      <label className="block text-gray-700 mb-2 text-left">Pages</label>
-                      <Select
-                        classNamePrefix="react-select"
-                        isMulti
-                        isSearchable
-                        isDisabled={!selectedSpace}
-                        options={pages.map(page => ({ value: page, label: page }))}
-                        value={selectedPages.map(page => ({ value: page, label: page }))}
-                        onChange={options => setSelectedPages(options ? options.map(opt => opt.value) : [])}
-                        placeholder={selectedSpace ? "Type or select pages..." : "Select a space first"}
-                        closeMenuOnSelect={false}
-                      />
-                      <div className="text-xs text-gray-500 mt-1 text-left">Type to search and select multiple pages.</div>
-                    </div>
+                    {error && <p className="text-red-500 text-sm mt-4">{error}</p>}
                   </div>
-                  {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
                 </div>
-              </div>
-            )}
-            {/* Goal Input Section */}
-            {!planSteps.length && !isPlanning && (
-              <div className="max-w-4xl mx-auto">
-                <div className="bg-white/60 backdrop-blur-xl rounded-xl p-8 border border-white/20 shadow-lg text-center">
-                  <h3 className="text-2xl font-bold text-gray-800 mb-6">What do you want the assistant to help you achieve?</h3>
-                  <div className="relative">
-                    <textarea
-                      value={goal}
-                      onChange={(e) => setGoal(e.target.value)}
-                      placeholder="Describe your goal in detail... (e.g., 'Help me analyze our documentation structure and recommend improvements for better user experience')"
-                      className="w-full p-4 border-2 border-orange-200/50 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 resize-none bg-white/70 backdrop-blur-sm text-lg"
-                      rows={4}
-                    />
-                    <button
-                      onClick={handleGoalSubmit}
-                      disabled={!goal.trim() || !selectedSpace || !selectedPages.length}
-                      className="absolute bottom-4 right-4 bg-orange-500/90 backdrop-blur-sm text-white p-3 rounded-lg hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center space-x-2 transition-colors border border-white/10"
-                    >
-                      <Send className="w-5 h-5" />
-                    </button>
-                  </div>
-                  {error && <p className="text-red-500 text-sm mt-4">{error}</p>}
-                </div>
-              </div>
-            )}
-            {/* Planning Phase - removed planning box */}
-            {isPlanning && null}
-            {/* Results Area */}
-            {planSteps.length > 0 && (
-              <div className="w-full">
-                {outputTabs.length > 0 && (
-                  <div className="bg-white/60 backdrop-blur-xl rounded-xl border border-white/20 shadow-lg overflow-hidden">
-                    {/* Tab Headers */}
-                    <div className="border-b border-white/20 bg-white/40 backdrop-blur-sm">
-                      <div className="flex overflow-x-auto">
-                        {outputTabs.map(tab => {
-                          const Icon = tab.icon;
-                          return (
-                            <button
-                              key={tab.id}
-                              onClick={() => setActiveTab(tab.id)}
-                              className={`flex items-center space-x-2 px-4 py-3 border-b-2 transition-colors whitespace-nowrap ${
-                                activeTab === tab.id
-                                  ? 'border-orange-500 text-orange-600 bg-white/50'
-                                  : 'border-transparent text-gray-600 hover:text-gray-800 hover:bg-white/30'
-                              }`}
-                            >
-                              <Icon className="w-4 h-4" />
-                              <span className="text-sm font-medium">{tab.label}</span>
-                            </button>
-                          );
-                        })}
+              )}
+              {/* Planning Phase - removed planning box */}
+              {isPlanning && null}
+              {/* Results Area */}
+              {planSteps.length > 0 && (
+                <div className="w-full">
+                  {outputTabs.length > 0 && (
+                    <div className="bg-white/60 backdrop-blur-xl rounded-xl border border-white/20 shadow-lg overflow-hidden">
+                      {/* Tab Headers */}
+                      <div className="border-b border-white/20 bg-white/40 backdrop-blur-sm">
+                        <div className="flex overflow-x-auto">
+                          {outputTabs.map(tab => {
+                            const Icon = tab.icon;
+                            return (
+                              <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`flex items-center space-x-2 px-4 py-3 border-b-2 transition-colors whitespace-nowrap ${
+                                  activeTab === tab.id
+                                    ? 'border-orange-500 text-orange-600 bg-white/50'
+                                    : 'border-transparent text-gray-600 hover:text-gray-800 hover:bg-white/30'
+                                }`}
+                              >
+                                <Icon className="w-4 h-4" />
+                                <span className="text-sm font-medium">{tab.label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      {/* Tab Content */}
+                      <div className="p-6">
+                        {outputTabs.find(tab => tab.id === activeTab) && (
+                          <div className="prose prose-sm max-w-none">
+                            {activeTab === 'qa' ? (
+                              <div>
+                                <div className="whitespace-pre-wrap text-gray-700 mb-4">
+                                  {outputTabs.find(tab => tab.id === activeTab)?.content}
+                                </div>
+                                {showFollowUp && (
+                                  <div className="border-t border-white/20 pt-4">
+                                    <div className="flex space-x-2">
+                                      <input
+                                        type="text"
+                                        value={followUpQuestion}
+                                        onChange={(e) => setFollowUpQuestion(e.target.value)}
+                                        placeholder="Ask a follow-up question..."
+                                        className="flex-1 p-3 border border-white/30 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white/70 backdrop-blur-sm"
+                                        onKeyPress={(e) => e.key === 'Enter' && handleFollowUp()}
+                                      />
+                                      <button
+                                        onClick={handleFollowUp}
+                                        disabled={!followUpQuestion.trim() || !selectedSpace || selectedPages.length === 0}
+                                        className="px-4 py-3 bg-orange-500/90 backdrop-blur-sm text-white rounded-lg hover:bg-orange-600 disabled:bg-gray-300 transition-colors flex items-center border border-white/10"
+                                      >
+                                        <Plus className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="whitespace-pre-wrap text-gray-700">
+                                {outputTabs.find(tab => tab.id === activeTab)?.content.split('\n').map((line, index) => {
+                                  if (line.startsWith('### ')) {
+                                    return <h3 key={index} className="text-lg font-bold text-gray-800 mt-4 mb-2">{line.substring(4)}</h3>;
+                                  } else if (line.startsWith('## ')) {
+                                    return <h2 key={index} className="text-xl font-bold text-gray-800 mt-6 mb-3">{line.substring(3)}</h2>;
+                                  } else if (line.startsWith('# ')) {
+                                    return <h1 key={index} className="text-2xl font-bold text-gray-800 mt-8 mb-4">{line.substring(2)}</h1>;
+                                  } else if (line.startsWith('- **')) {
+                                    const match = line.match(/- \*\*(.*?)\*\*: (.*)/);
+                                    if (match) {
+                                      return <p key={index} className="mb-2"><strong>{match[1]}:</strong> {match[2]}</p>;
+                                    }
+                                  } else if (line.startsWith('- ')) {
+                                    return <p key={index} className="mb-1 ml-4"> 2 {line.substring(2)}</p>;
+                                  } else if (line.trim()) {
+                                    return <p key={index} className="mb-2 text-gray-700">{line}</p>;
+                                  }
+                                  return <br key={index} />;
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
-                    {/* Tab Content */}
-                    <div className="p-6">
-                      {outputTabs.find(tab => tab.id === activeTab) && (
-                        <div className="prose prose-sm max-w-none">
-                          {activeTab === 'qa' ? (
-                            <div>
-                              <div className="whitespace-pre-wrap text-gray-700 mb-4">
-                                {outputTabs.find(tab => tab.id === activeTab)?.content}
-                              </div>
-                              {showFollowUp && (
-                                <div className="border-t border-white/20 pt-4">
-                                  <div className="flex space-x-2">
-                                    <input
-                                      type="text"
-                                      value={followUpQuestion}
-                                      onChange={(e) => setFollowUpQuestion(e.target.value)}
-                                      placeholder="Ask a follow-up question..."
-                                      className="flex-1 p-3 border border-white/30 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white/70 backdrop-blur-sm"
-                                      onKeyPress={(e) => e.key === 'Enter' && handleFollowUp()}
-                                    />
-                                    <button
-                                      onClick={handleFollowUp}
-                                      disabled={!followUpQuestion.trim() || !selectedSpace || selectedPages.length === 0}
-                                      className="px-4 py-3 bg-orange-500/90 backdrop-blur-sm text-white rounded-lg hover:bg-orange-600 disabled:bg-gray-300 transition-colors flex items-center border border-white/10"
-                                    >
-                                      <Plus className="w-4 h-4" />
-                                    </button>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="whitespace-pre-wrap text-gray-700">
-                              {outputTabs.find(tab => tab.id === activeTab)?.content.split('\n').map((line, index) => {
-                                if (line.startsWith('### ')) {
-                                  return <h3 key={index} className="text-lg font-bold text-gray-800 mt-4 mb-2">{line.substring(4)}</h3>;
-                                } else if (line.startsWith('## ')) {
-                                  return <h2 key={index} className="text-xl font-bold text-gray-800 mt-6 mb-3">{line.substring(3)}</h2>;
-                                } else if (line.startsWith('# ')) {
-                                  return <h1 key={index} className="text-2xl font-bold text-gray-800 mt-8 mb-4">{line.substring(2)}</h1>;
-                                } else if (line.startsWith('- **')) {
-                                  const match = line.match(/- \*\*(.*?)\*\*: (.*)/);
-                                  if (match) {
-                                    return <p key={index} className="mb-2"><strong>{match[1]}:</strong> {match[2]}</p>;
-                                  }
-                                } else if (line.startsWith('- ')) {
-                                  return <p key={index} className="mb-1 ml-4"> 2 {line.substring(2)}</p>;
-                                } else if (line.trim()) {
-                                  return <p key={index} className="mb-2 text-gray-700">{line}</p>;
-                                }
-                                return <br key={index} />;
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-            {/* Actions */}
-            {planSteps.length > 0 && !isPlanning && !isExecuting && (
-              <div className="flex justify-end mt-8 space-x-4">
-                <button
-                  onClick={exportPlan}
-                  className="px-6 py-3 bg-orange-500/90 text-white rounded-lg hover:bg-orange-600 transition-colors font-semibold shadow-md border border-white/10"
-                >
-                  <Download className="w-5 h-5 inline-block mr-2" />
-                  Export Plan
-                </button>
-                <button
-                  onClick={replaySteps}
-                  className="px-6 py-3 bg-white/80 text-orange-600 rounded-lg hover:bg-orange-100 transition-colors font-semibold shadow-md border border-orange-200/50"
-                >
-                  <RotateCcw className="w-5 h-5 inline-block mr-2" />
-                  Replay Steps
-                </button>
-              </div>
-            )}
+                  )}
+                </div>
+              )}
+              {/* Actions */}
+              {planSteps.length > 0 && !isPlanning && !isExecuting && (
+                <div className="flex justify-end mt-8 space-x-4">
+                  <button
+                    onClick={exportPlan}
+                    className="px-6 py-3 bg-orange-500/90 text-white rounded-lg hover:bg-orange-600 transition-colors font-semibold shadow-md border border-white/10"
+                  >
+                    <Download className="w-5 h-5 inline-block mr-2" />
+                    Export Plan
+                  </button>
+                  <button
+                    onClick={replaySteps}
+                    className="px-6 py-3 bg-white/80 text-orange-600 rounded-lg hover:bg-orange-100 transition-colors font-semibold shadow-md border border-orange-200/50"
+                  >
+                    <RotateCcw className="w-5 h-5 inline-block mr-2" />
+                    Replay Steps
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
