@@ -1,4 +1,4 @@
-const API_BASE_URL = ''; // Replace with your backend render URL
+const API_BASE_URL = 'https://finalui-nx6r.onrender.com'; // Replace with your backend render URL
 
 export interface SearchRequest {
   space_key: string;
