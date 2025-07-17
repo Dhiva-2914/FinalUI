@@ -40,6 +40,10 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
   const [selectedPages, setSelectedPages] = useState<string[]>([]);
   const [error, setError] = useState('');
 
+  // Add new state for search input
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+
   // Load spaces on mount
   useEffect(() => {
     const loadSpaces = async () => {
@@ -224,6 +228,40 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
       setError(err.message || 'An error occurred during orchestration.');
     } finally {
       setIsPlanning(false);
+    }
+  };
+
+  const handleSearch = async () => {
+    if (!searchQuery.trim() || !selectedSpace || selectedPages.length === 0) {
+      setError('Please enter a search query, select a space, and at least one page.');
+      return;
+    }
+    setIsSearching(true);
+    setError('');
+    try {
+      const result = await apiService.search({
+        space_key: selectedSpace,
+        page_titles: selectedPages,
+        query: searchQuery,
+      });
+      // Add or update the Search Results tab
+      setOutputTabs((prevTabs) => {
+        const otherTabs = prevTabs.filter(tab => tab.id !== 'search-results');
+        return [
+          ...otherTabs,
+          {
+            id: 'search-results',
+            label: 'Search Results',
+            icon: Zap,
+            content: result.response || 'No results found.',
+          },
+        ];
+      });
+      setActiveTab('search-results');
+    } catch (err) {
+      setError('Failed to perform search.');
+    } finally {
+      setIsSearching(false);
     }
   };
 
@@ -455,56 +493,70 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
             </div>
           </div>
         </div>
-
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
-          {/* Space and Page Selectors */}
-          {!planSteps.length && !isPlanning && (
-            <div className="max-w-4xl mx-auto mb-6">
-              <div className="bg-white/60 backdrop-blur-xl rounded-xl p-6 border border-white/20 shadow-lg text-center">
-                <h3 className="text-xl font-bold text-gray-800 mb-4">Select Space and Pages</h3>
-                <div className="flex flex-col md:flex-row md:space-x-4 items-center justify-center mb-4">
-                  <div className="mb-4 md:mb-0 w-full md:w-1/2">
-                    <label className="block text-gray-700 mb-2 text-left">Space</label>
-                    <select
-                      className="w-full p-3 border border-orange-200/50 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white/70 backdrop-blur-sm"
-                      value={selectedSpace}
-                      onChange={e => {
-                        setSelectedSpace(e.target.value);
-                        setSelectedPages([]);
-                      }}
-                    >
-                      <option value="">Select a space...</option>
-                      {spaces.map(space => (
-                        <option key={space.key} value={space.key}>{space.name} ({space.key})</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="w-full md:w-1/2">
-                    <label className="block text-gray-700 mb-2 text-left">Pages</label>
-                    <select
-                      className="w-full p-3 border border-orange-200/50 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white/70 backdrop-blur-sm"
-                      multiple
-                      size={Math.min(6, pages.length)}
-                      value={selectedPages}
-                      onChange={e => {
-                        const options = Array.from(e.target.selectedOptions).map(opt => opt.value);
-                        setSelectedPages(options);
-                      }}
-                      disabled={!selectedSpace}
-                    >
-                      {pages.map(page => (
-                        <option key={page} value={page}>{page}</option>
-                      ))}
-                    </select>
-                    <div className="text-xs text-gray-500 mt-1 text-left">Hold Ctrl (Windows) or Cmd (Mac) to select multiple pages.</div>
-                  </div>
-                </div>
-                {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
+        {/* Persistent Selectors and Search Bar */}
+        <div className="p-6 pb-0 border-b border-orange-300/10 bg-white/60 backdrop-blur-xl">
+          <div className="max-w-4xl mx-auto flex flex-col md:flex-row md:space-x-4 items-center justify-center mb-4">
+            <div className="mb-4 md:mb-0 w-full md:w-1/3">
+              <label className="block text-gray-700 mb-2 text-left">Space</label>
+              <select
+                className="w-full p-3 border border-orange-200/50 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white/70 backdrop-blur-sm"
+                value={selectedSpace}
+                onChange={e => {
+                  setSelectedSpace(e.target.value);
+                  setSelectedPages([]);
+                }}
+              >
+                <option value="">Select a space...</option>
+                {spaces.map(space => (
+                  <option key={space.key} value={space.key}>{space.name} ({space.key})</option>
+                ))}
+              </select>
+            </div>
+            <div className="mb-4 md:mb-0 w-full md:w-1/3">
+              <label className="block text-gray-700 mb-2 text-left">Pages</label>
+              <select
+                className="w-full p-3 border border-orange-200/50 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white/70 backdrop-blur-sm"
+                multiple
+                size={Math.min(6, pages.length)}
+                value={selectedPages}
+                onChange={e => {
+                  const options = Array.from(e.target.selectedOptions).map(opt => opt.value);
+                  setSelectedPages(options);
+                }}
+                disabled={!selectedSpace}
+              >
+                {pages.map(page => (
+                  <option key={page} value={page}>{page}</option>
+                ))}
+              </select>
+              <div className="text-xs text-gray-500 mt-1 text-left">Hold Ctrl (Windows) or Cmd (Mac) to select multiple pages.</div>
+            </div>
+            <div className="w-full md:w-1/3 flex flex-col items-stretch">
+              <label className="block text-gray-700 mb-2 text-left">Search in Selected Pages</label>
+              <div className="flex">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder="Type your search..."
+                  className="flex-1 p-3 border border-orange-200/50 rounded-l-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white/70 backdrop-blur-sm"
+                  disabled={!selectedSpace || selectedPages.length === 0}
+                />
+                <button
+                  onClick={handleSearch}
+                  disabled={!searchQuery.trim() || !selectedSpace || selectedPages.length === 0 || isSearching}
+                  className="px-4 bg-orange-500/90 text-white rounded-r-lg hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed border border-orange-200/50 border-l-0"
+                >
+                  {isSearching ? <Loader2 className="w-5 h-5 animate-spin" /> : <Zap className="w-5 h-5" />}
+                </button>
               </div>
             </div>
-          )}
-
-          {/* Goal Input Section */}
+          </div>
+          {error && <p className="text-red-500 text-sm mt-2 text-center">{error}</p>}
+        </div>
+        {/* Main Content */}
+        <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
+          {/* Goal Input Section (only if not planning/executing) */}
           {!planSteps.length && !isPlanning && (
             <div className="max-w-4xl mx-auto">
               <div className="bg-white/60 backdrop-blur-xl rounded-xl p-8 border border-white/20 shadow-lg text-center">
@@ -529,7 +581,6 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
               </div>
             </div>
           )}
-
           {/* Planning Phase */}
           {isPlanning && (
             <div className="max-w-4xl mx-auto">
@@ -548,7 +599,6 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
               </div>
             </div>
           )}
-
           {/* Execution Phase */}
           {planSteps.length > 0 && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
