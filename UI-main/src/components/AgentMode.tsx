@@ -545,8 +545,39 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
           {/* Execution Phase */}
           {planSteps.length > 0 && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Left Column - Progress Timeline */}
-              <div className="lg:col-span-1">
+              {/* Left Column - Chat and Progress Timeline */}
+              <div className="lg:col-span-1 space-y-6">
+                {/* Chat (Follow-up Q&A) */}
+                {outputTabs.find(tab => tab.id === 'qa') && (
+                  <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg mb-4">
+                    <h3 className="font-semibold text-gray-800 mb-2 flex items-center"><MessageSquare className="w-5 h-5 mr-2 text-orange-500" /> Chat</h3>
+                    <div className="prose prose-sm max-w-none mb-2 whitespace-pre-wrap text-gray-700">
+                      {outputTabs.find(tab => tab.id === 'qa')?.content}
+                    </div>
+                    {showFollowUp && (
+                      <div className="border-t border-white/20 pt-2 mt-2">
+                        <div className="flex space-x-2">
+                          <input
+                            type="text"
+                            value={followUpQuestion}
+                            onChange={(e) => setFollowUpQuestion(e.target.value)}
+                            placeholder="Ask a follow-up question..."
+                            className="flex-1 p-2 border border-white/30 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white/70 backdrop-blur-sm"
+                            onKeyPress={(e) => e.key === 'Enter' && handleFollowUp()}
+                          />
+                          <button
+                            onClick={handleFollowUp}
+                            disabled={!followUpQuestion.trim() || !selectedSpace || selectedPages.length === 0}
+                            className="px-3 py-2 bg-orange-500/90 backdrop-blur-sm text-white rounded-lg hover:bg-orange-600 disabled:bg-gray-300 transition-colors flex items-center border border-white/10"
+                          >
+                            <Plus className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {/* Progress Timeline */}
                 <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg">
                   <h3 className="font-semibold text-gray-800 mb-4">Live Progress Log</h3>
                   <div className="space-y-4">
@@ -570,7 +601,6 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
                       </div>
                     ))}
                   </div>
-                  
                   {/* Progress Bar */}
                   <div className="mt-6">
                     <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
