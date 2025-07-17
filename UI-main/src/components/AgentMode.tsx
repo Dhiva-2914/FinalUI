@@ -458,44 +458,46 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
         </div>
 
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
-          {/* Space and Page Selectors - always visible */}
-          <div className="max-w-4xl mx-auto mb-6 sticky top-0 z-30">
-            <div className="bg-white/60 backdrop-blur-xl rounded-xl p-6 border border-white/20 shadow-lg text-center">
-              <h3 className="text-xl font-bold text-gray-800 mb-4">Select Space and Pages</h3>
-              <div className="flex flex-col md:flex-row md:space-x-4 items-center justify-center mb-4">
-                <div className="mb-4 md:mb-0 w-full md:w-1/2">
-                  <label className="block text-gray-700 mb-2 text-left">Space</label>
-                  <Select
-                    classNamePrefix="react-select"
-                    options={spaces.map(space => ({ value: space.key, label: `${space.name} (${space.key})` }))}
-                    value={spaces.find(s => s.key === selectedSpace) ? { value: selectedSpace, label: `${spaces.find(s => s.key === selectedSpace)?.name} (${selectedSpace})` } : null}
-                    onChange={option => {
-                      setSelectedSpace(option ? option.value : '');
-                      setSelectedPages([]);
-                    }}
-                    placeholder="Select a space..."
-                    isClearable
-                  />
+          {/* Space and Page Selectors - always visible before results, move to left after results */}
+          {planSteps.length === 0 && !isPlanning && (
+            <div className="max-w-4xl mx-auto mb-6 sticky top-0 z-30">
+              <div className="bg-white/60 backdrop-blur-xl rounded-xl p-6 border border-white/20 shadow-lg text-center">
+                <h3 className="text-xl font-bold text-gray-800 mb-4">Select Space and Pages</h3>
+                <div className="flex flex-col md:flex-row md:space-x-4 items-center justify-center mb-4">
+                  <div className="mb-4 md:mb-0 w-full md:w-1/2">
+                    <label className="block text-gray-700 mb-2 text-left">Space</label>
+                    <Select
+                      classNamePrefix="react-select"
+                      options={spaces.map(space => ({ value: space.key, label: `${space.name} (${space.key})` }))}
+                      value={spaces.find(s => s.key === selectedSpace) ? { value: selectedSpace, label: `${spaces.find(s => s.key === selectedSpace)?.name} (${selectedSpace})` } : null}
+                      onChange={option => {
+                        setSelectedSpace(option ? option.value : '');
+                        setSelectedPages([]);
+                      }}
+                      placeholder="Select a space..."
+                      isClearable
+                    />
+                  </div>
+                  <div className="w-full md:w-1/2">
+                    <label className="block text-gray-700 mb-2 text-left">Pages</label>
+                    <Select
+                      classNamePrefix="react-select"
+                      isMulti
+                      isSearchable
+                      isDisabled={!selectedSpace}
+                      options={pages.map(page => ({ value: page, label: page }))}
+                      value={selectedPages.map(page => ({ value: page, label: page }))}
+                      onChange={options => setSelectedPages(options ? options.map(opt => opt.value) : [])}
+                      placeholder={selectedSpace ? "Type or select pages..." : "Select a space first"}
+                      closeMenuOnSelect={false}
+                    />
+                    <div className="text-xs text-gray-500 mt-1 text-left">Type to search and select multiple pages.</div>
+                  </div>
                 </div>
-                <div className="w-full md:w-1/2">
-                  <label className="block text-gray-700 mb-2 text-left">Pages</label>
-                  <Select
-                    classNamePrefix="react-select"
-                    isMulti
-                    isSearchable
-                    isDisabled={!selectedSpace}
-                    options={pages.map(page => ({ value: page, label: page }))}
-                    value={selectedPages.map(page => ({ value: page, label: page }))}
-                    onChange={options => setSelectedPages(options ? options.map(opt => opt.value) : [])}
-                    placeholder={selectedSpace ? "Type or select pages..." : "Select a space first"}
-                    closeMenuOnSelect={false}
-                  />
-                  <div className="text-xs text-gray-500 mt-1 text-left">Type to search and select multiple pages.</div>
-                </div>
+                {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
               </div>
-              {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
             </div>
-          </div>
+          )}
 
           {/* Goal Input Section */}
           {!planSteps.length && !isPlanning && (
@@ -545,8 +547,42 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
           {/* Execution Phase */}
           {planSteps.length > 0 && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Left Column - Chat and Progress Timeline */}
+              {/* Left Column - Space/Page Selectors, Chat, and Progress Timeline */}
               <div className="lg:col-span-1 space-y-6">
+                {/* Space and Page Selectors (after results) */}
+                <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg">
+                  <h3 className="text-lg font-bold text-gray-800 mb-4">Select Space and Pages</h3>
+                  <div className="mb-4">
+                    <label className="block text-gray-700 mb-2 text-left">Space</label>
+                    <Select
+                      classNamePrefix="react-select"
+                      options={spaces.map(space => ({ value: space.key, label: `${space.name} (${space.key})` }))}
+                      value={spaces.find(s => s.key === selectedSpace) ? { value: selectedSpace, label: `${spaces.find(s => s.key === selectedSpace)?.name} (${selectedSpace})` } : null}
+                      onChange={option => {
+                        setSelectedSpace(option ? option.value : '');
+                        setSelectedPages([]);
+                      }}
+                      placeholder="Select a space..."
+                      isClearable
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-gray-700 mb-2 text-left">Pages</label>
+                    <Select
+                      classNamePrefix="react-select"
+                      isMulti
+                      isSearchable
+                      isDisabled={!selectedSpace}
+                      options={pages.map(page => ({ value: page, label: page }))}
+                      value={selectedPages.map(page => ({ value: page, label: page }))}
+                      onChange={options => setSelectedPages(options ? options.map(opt => opt.value) : [])}
+                      placeholder={selectedSpace ? "Type or select pages..." : "Select a space first"}
+                      closeMenuOnSelect={false}
+                    />
+                    <div className="text-xs text-gray-500 mt-1 text-left">Type to search and select multiple pages.</div>
+                  </div>
+                  {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
+                </div>
                 {/* Chat (Follow-up Q&A) */}
                 {outputTabs.find(tab => tab.id === 'qa') && (
                   <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg mb-4">
@@ -567,7 +603,7 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
                           />
                           <button
                             onClick={handleFollowUp}
-                            disabled={!followUpQuestion.trim() || !selectedSpace || selectedPages.length === 0}
+                            disabled={!followUpQuestion.trim() || !selectedSpace || !selectedPages.length}
                             className="px-3 py-2 bg-orange-500/90 backdrop-blur-sm text-white rounded-lg hover:bg-orange-600 disabled:bg-gray-300 transition-colors flex items-center border border-white/10"
                           >
                             <Plus className="w-4 h-4" />
