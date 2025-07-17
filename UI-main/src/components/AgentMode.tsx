@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Select from 'react-select';
-import { Zap, X, Send, Download, RotateCcw, FileText, Brain, CheckCircle, Loader2, MessageSquare, Plus } from 'lucide-react';
+import { Zap, X, Send, Download, RotateCcw, FileText, Brain, CheckCircle, Loader2, MessageSquare, Plus, LayoutSidebar } from 'lucide-react';
 import type { AppMode } from '../App';
 import { apiService, analyzeGoal } from '../services/api';
 
@@ -44,6 +44,9 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
 
   // Chat input for instructions at any time
   const [chatInput, setChatInput] = useState('');
+
+  // Add state for selected page in final answer
+  const [selectedFinalPage, setSelectedFinalPage] = useState<string | null>(null);
 
   // Open sidebar when results are displayed
   useEffect(() => {
@@ -204,12 +207,36 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
         return `## ${tool}\n${output}`;
       }).join('\n\n');
       const finalAnswer = Object.values(toolResults).map(getRelevantOutput).filter(Boolean).join('\n\n');
+      // Prepare output tabs
+      const pageOutputs: Record<string, string> = {};
+      selectedPagesFromAI.forEach((page: string) => {
+        // Try to get output for this page from toolResults
+        let output = '';
+        // Try to find a result for this page in toolResults
+        for (const key in toolResults) {
+          const result = toolResults[key];
+          if (Array.isArray(result)) {
+            // If result is an array, try to find an object with page_title or similar
+            const found = result.find((r: any) => r && (r.page_title === page || r.title === page));
+            if (found) {
+              output = getRelevantOutput(found);
+              break;
+            }
+          } else if (result && (result.page_title === page || result.title === page)) {
+            output = getRelevantOutput(result);
+            break;
+          }
+        }
+        if (!output) output = getRelevantOutput(toolResults['AI Powered Search']); // fallback
+        pageOutputs[page] = output;
+      });
       const tabs = [
         {
           id: 'final-answer',
           label: 'Final Answer',
           icon: FileText,
-          content: finalAnswer,
+          content: '', // We'll render this in JSX below
+          pageOutputs,
         },
         {
           id: 'reasoning',
@@ -232,6 +259,7 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
       ];
       setOutputTabs(tabs);
       setActiveTab('final-answer');
+      setSelectedFinalPage(selectedPagesFromAI[0] || null);
     } catch (err: any) {
       setError(err.message || 'An error occurred during orchestration.');
     } finally {
@@ -477,7 +505,7 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
                 title="Close sidebar"
                 style={{ zIndex: 20 }}
               >
-
+                <LayoutSidebar className="w-6 h-6" />
               </button>
               {/* Space and Page Selectors */}
               <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg">
@@ -516,21 +544,22 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
               {/* Chat Section - always present */}
               <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg mb-4">
                 <h3 className="font-semibold text-gray-800 mb-2 flex items-center"><MessageSquare className="w-5 h-5 mr-2 text-orange-500" /> Chat</h3>
-                <div className="mb-2">
+                <div className="mb-2 flex space-x-2">
                   <input
                     type="text"
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
                     placeholder="Type your instruction..."
-                    className="w-full p-2 border border-white/30 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white/70 backdrop-blur-sm mb-2"
+                    className="flex-1 p-2 border border-white/30 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white/70 backdrop-blur-sm mb-0"
                     onKeyPress={(e) => e.key === 'Enter' && handleChatSubmit()}
                   />
                   <button
                     onClick={handleChatSubmit}
                     disabled={!chatInput.trim() || !selectedSpace || !selectedPages.length}
-                    className="w-full px-3 py-2 bg-orange-500/90 backdrop-blur-sm text-white rounded-lg hover:bg-orange-600 disabled:bg-gray-300 transition-colors flex items-center justify-center border border-white/10"
+                    className="px-2 py-1 bg-orange-500/90 backdrop-blur-sm text-white rounded-lg hover:bg-orange-600 disabled:bg-gray-300 transition-colors flex items-center justify-center border border-white/10 text-xs"
+                    style={{ minWidth: 0 }}
                   >
-                    <Send className="w-4 h-4 mr-2" /> Send
+                    <Send className="w-4 h-4" />
                   </button>
                 </div>
                 <div className="prose prose-sm max-w-none whitespace-pre-wrap text-gray-700">
@@ -688,34 +717,26 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
                       <div className="p-6">
                         {outputTabs.find(tab => tab.id === activeTab) && (
                           <div className="prose prose-sm max-w-none">
-                            {activeTab === 'qa' ? (
+                            {/* Final Answer tab with per-page buttons */}
+                            {activeTab === 'final-answer' && outputTabs.find(tab => tab.id === 'final-answer')?.pageOutputs ? (
                               <div>
-                                <div className="whitespace-pre-wrap text-gray-700 mb-4">
-                                  {outputTabs.find(tab => tab.id === activeTab)?.content}
+                                <div className="mb-4 flex flex-wrap gap-2">
+                                  {Object.keys(outputTabs.find(tab => tab.id === 'final-answer').pageOutputs).map(page => (
+                                    <button
+                                      key={page}
+                                      className={`px-3 py-1 rounded text-xs font-semibold border ${selectedFinalPage === page ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-orange-600 border-orange-300 hover:bg-orange-100'} transition-colors`}
+                                      onClick={() => setSelectedFinalPage(page)}
+                                    >
+                                      {page}
+                                    </button>
+                                  ))}
                                 </div>
-                                {showFollowUp && (
-                                  <div className="border-t border-white/20 pt-4">
-                                    <div className="flex space-x-2">
-                                      <input
-                                        type="text"
-                                        value={followUpQuestion}
-                                        onChange={(e) => setFollowUpQuestion(e.target.value)}
-                                        placeholder="Ask a follow-up question..."
-                                        className="flex-1 p-3 border border-white/30 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white/70 backdrop-blur-sm"
-                                        onKeyPress={(e) => e.key === 'Enter' && handleFollowUp()}
-                                      />
-                                      <button
-                                        onClick={handleFollowUp}
-                                        disabled={!followUpQuestion.trim() || !selectedSpace || selectedPages.length === 0}
-                                        className="px-4 py-3 bg-orange-500/90 backdrop-blur-sm text-white rounded-lg hover:bg-orange-600 disabled:bg-gray-300 transition-colors flex items-center border border-white/10"
-                                      >
-                                        <Plus className="w-4 h-4" />
-                                      </button>
-                                    </div>
-                                  </div>
-                                )}
+                                <div className="whitespace-pre-wrap text-gray-700">
+                                  {outputTabs.find(tab => tab.id === 'final-answer').pageOutputs[selectedFinalPage || Object.keys(outputTabs.find(tab => tab.id === 'final-answer').pageOutputs)[0]] || 'No output for this page.'}
+                                </div>
                               </div>
                             ) : (
+                              // Other tabs or fallback
                               <div className="whitespace-pre-wrap text-gray-700">
                                 {outputTabs.find(tab => tab.id === activeTab)?.content.split('\n').map((line, index) => {
                                   if (line.startsWith('### ')) {
