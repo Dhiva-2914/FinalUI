@@ -506,7 +506,7 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
                 title="Close sidebar"
                 style={{ zIndex: 20 }}
               >
-
+                <X className="w-5 h-5" />
               </button>
               {/* Space and Page Selectors */}
               <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg">
@@ -614,7 +614,7 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
               onClick={() => setSidebarOpen(true)}
               title="Open sidebar"
             >
-
+              <Plus className="w-5 h-5" />
             </button>
           )}
           {/* Main Content */}
@@ -721,20 +721,34 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
                             {/* Final Answer tab with per-page buttons */}
                             {activeTab === 'final-answer' && outputTabs.find(tab => tab.id === 'final-answer')?.pageOutputs ? (
                               <div>
-                                <div className="mb-4 flex flex-wrap gap-2">
-                                  {Object.keys(outputTabs.find(tab => tab.id === 'final-answer').pageOutputs).map(page => (
-                                    <button
-                                      key={page}
-                                      className={`px-3 py-1 rounded text-xs font-semibold border ${selectedFinalPage === page ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-orange-600 border-orange-300 hover:bg-orange-100'} transition-colors`}
-                                      onClick={() => setSelectedFinalPage(page)}
-                                    >
-                                      {page}
-                                    </button>
-                                  ))}
-                                </div>
-                                <div className="whitespace-pre-wrap text-gray-700">
-                                  {outputTabs.find(tab => tab.id === 'final-answer').pageOutputs[selectedFinalPage || Object.keys(outputTabs.find(tab => tab.id === 'final-answer').pageOutputs)[0]] || 'No output for this page.'}
-                                </div>
+                                {(outputTabs.find(tab => tab.id === 'final-answer')?.pageOutputs &&
+                                  Object.keys(outputTabs.find(tab => tab.id === 'final-answer')?.pageOutputs ?? {}).length > 0) ? (
+                                  <>
+                                    <div className="mb-4 flex flex-wrap gap-2">
+                                      {(Object.keys(outputTabs.find(tab => tab.id === 'final-answer')?.pageOutputs ?? [])).map(page => (
+                                        <button
+                                          key={page}
+                                          className={`px-3 py-1 rounded text-xs font-semibold border ${selectedFinalPage === page ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-orange-600 border-orange-300 hover:bg-orange-100'} transition-colors`}
+                                          onClick={() => setSelectedFinalPage(page)}
+                                        >
+                                          {page}
+                                        </button>
+                                      ))}
+                                    </div>
+                                    <div className="whitespace-pre-wrap text-gray-700">
+                                      {(() => {
+                                        const pageOutputs = outputTabs.find(tab => tab.id === 'final-answer')?.pageOutputs ?? {};
+                                        const pageKey = selectedFinalPage || Object.keys(pageOutputs)[0];
+                                        return pageOutputs[pageKey] || 'No output for this page.';
+                                      })()}
+                                    </div>
+                                  </>
+                                ) : (
+                                  <div className="whitespace-pre-wrap text-gray-700">
+                                    {/* Fallback to summary if no per-page outputs */}
+                                    {outputTabs.find(tab => tab.id === 'final-answer')?.content || 'No summary available.'}
+                                  </div>
+                                )}
                               </div>
                             ) : (
                               // Other tabs or fallback
