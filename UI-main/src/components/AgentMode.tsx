@@ -742,9 +742,17 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
                                     </div>
                                     <div className="whitespace-pre-wrap text-gray-700">
                                       {(() => {
-                                        const pageOutputs = outputTabs.find(tab => tab.id === 'final-answer')?.pageOutputs ?? {};
+                                        const finalTab = outputTabs.find(tab => tab.id === 'final-answer');
+                                        const pageOutputs = finalTab?.pageOutputs ?? {};
                                         const pageKey = selectedFinalPage || Object.keys(pageOutputs)[0];
-                                        return pageOutputs[pageKey] || 'No output for this page.';
+                                        const output = pageOutputs[pageKey];
+                                        if (output && output.trim()) {
+                                          return output;
+                                        } else if (finalTab?.content && finalTab.content.trim()) {
+                                          return finalTab.content;
+                                        } else {
+                                          return 'No output or summary available for this page.';
+                                        }
                                       })()}
                                     </div>
                                   </>
