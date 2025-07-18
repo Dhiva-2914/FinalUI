@@ -180,14 +180,7 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
             space_key: selectedSpace,
             page_title: selectedPagesFromAI[0],
           });
-          // If the response is a string and contains the known error message, show a user-friendly fallback
-          if (typeof res === 'string' && res.includes('Please provide the content of the Confluence page')) {
-            toolResults['Video Summarizer'] = {
-              summary: '⚠️ This page only contains a video and no text content. Video summarization requires text or transcript. Please add a transcript or description to the page for better results.'
-            };
-          } else {
-            toolResults['Video Summarizer'] = res;
-          }
+          toolResults['Video Summarizer'] = res;
         } catch (err: any) {
           toolResults['Video Summarizer'] = { summary: '⚠️ Failed to run Video Summarizer: ' + (err.message || 'Unknown error') };
         }
