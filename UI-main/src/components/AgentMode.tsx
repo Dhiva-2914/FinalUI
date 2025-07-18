@@ -256,7 +256,8 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
       // Create individual outputs for each selected page
       for (const page of selectedPagesFromAI) {
         let pageOutput = '';
-        
+        let aiSearchOutput = '';
+        let videoSummaryOutput = '';
         // Try to get page-specific output by calling search for this specific page
         try {
           const pageSpecificResult = await apiService.search({
@@ -264,21 +265,37 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
             page_titles: [page],
             query: usedGoal,
           });
-          
           if (pageSpecificResult && pageSpecificResult.response) {
-            pageOutput = `## Analysis for "${page}"\n\n${pageSpecificResult.response}`;
-          } else {
-            // Fallback to general results
-            pageOutput = `## Analysis for "${page}"\n\n${finalAnswer}`;
+            aiSearchOutput = `### AI Search Result\n${pageSpecificResult.response}`;
           }
         } catch (err) {
-          // If page-specific search fails, use general results
-          pageOutput = `## Analysis for "${page}"\n\n${finalAnswer}`;
+          // ignore, fallback below
         }
-        
+        // Try to get video summary if tool is available
+        if (toolsToUse.includes('video_summarizer')) {
+          try {
+            const videoResult = await apiService.videoSummarizer({
+              space_key: selectedSpace,
+              page_title: page,
+            });
+            if (videoResult && videoResult.summary) {
+              videoSummaryOutput = `### Video Summary\n${videoResult.summary}`;
+            }
+          } catch (err) {
+            // ignore, fallback below
+          }
+        }
+        if (aiSearchOutput && videoSummaryOutput) {
+          pageOutput = aiSearchOutput + '\n\n' + videoSummaryOutput;
+        } else if (aiSearchOutput) {
+          pageOutput = aiSearchOutput;
+        } else if (videoSummaryOutput) {
+          pageOutput = videoSummaryOutput;
+        } else {
+          pageOutput = `No AI search or video summary available for "${page}".`;
+        }
         pageOutputs[page] = pageOutput;
       }
-      
       // If no pages were processed, create a general output
       if (Object.keys(pageOutputs).length === 0) {
         pageOutputs['General Analysis'] = finalAnswer;
