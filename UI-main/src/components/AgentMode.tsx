@@ -107,18 +107,6 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
       { id: 2, title: 'Executing', status: 'pending' },
     ]);
     setOutputTabs([]);
-    const usedGoal = goalOverride !== undefined ? goalOverride : goal;
-    if (!usedGoal.trim() || !selectedSpace || !selectedPages.length) {
-      setError('Please enter a goal, select a space, and at least one page.');
-      return;
-    }
-    setIsPlanning(true);
-    setError('');
-    setPlanSteps([
-      { id: 1, title: 'Analyzing Goal', status: 'pending' },
-      { id: 2, title: 'Executing', status: 'pending' },
-    ]);
-    setOutputTabs([]);
     setCurrentStep(0);
     setActiveTab('final-answer');
     let toolsToUse: string[] = [];
@@ -130,10 +118,12 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
       try {
         analysis = await analyzeGoal(usedGoal, selectedPages);
       } catch (err: any) {
-        if (err.message && err.message.includes('Failed to fetch')) {
-          setError('Network error: Unable to reach the server. Please check your connection and try again.');
+        if (err.message && (err.message.includes('Failed to fetch') || err.message.includes('NetworkError'))) {
+          setError('Could not connect to the backend service. Please check your network connection or try again later.');
+        } else if (err.message && err.message.includes('Failed to analyze goal')) {
+          setError('The backend could not process your goal. Please try rephrasing your request or try again later.');
         } else {
-          setError(err.message || 'An error occurred during goal analysis.');
+          setError(err.message || 'An unknown error occurred while analyzing the goal.');
         }
         setIsPlanning(false);
         return;
@@ -146,91 +136,97 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
       setCurrentStep(1);
       setPlanSteps((steps) => steps.map((s) => s.id === 2 ? { ...s, status: 'running' } : s));
       const toolResults: Record<string, any> = {};
-      // Helper to wrap each tool call in try/catch and provide partial results
-      const safeToolCall = async (label: string, fn: () => Promise<any>) => {
-        try {
-          return await fn();
-        } catch (err: any) {
-          toolResults[label + ' (Error)'] = err.message || 'Failed to fetch result.';
-          return null;
-        }
-      };
+      // Run each tool, but catch errors individually and add warnings instead of aborting the whole process
       if (toolsToUse.includes('ai_powered_search')) {
-        const res = await safeToolCall('AI Powered Search', async () =>
-          apiService.search({
+        try {
+          const res = await apiService.search({
             space_key: selectedSpace,
             page_titles: selectedPagesFromAI,
             query: usedGoal,
-          })
-        );
-        if (res) toolResults['AI Powered Search'] = res;
+          });
+          toolResults['AI Powered Search'] = res;
+        } catch (err: any) {
+          toolResults['AI Powered Search'] = { summary: '⚠️ Failed to run AI Powered Search: ' + (err.message || 'Unknown error') };
+        }
       }
       if (toolsToUse.includes('impact_analyzer') && selectedPagesFromAI.length >= 2) {
-        const res = await safeToolCall('Impact Analyzer', async () =>
-          apiService.impactAnalyzer({
+        try {
+          const res = await apiService.impactAnalyzer({
             space_key: selectedSpace,
             old_page_title: selectedPagesFromAI[0],
             new_page_title: selectedPagesFromAI[1],
             question: usedGoal,
-          })
-        );
-        if (res) toolResults['Impact Analyzer'] = res;
+          });
+          toolResults['Impact Analyzer'] = res;
+        } catch (err: any) {
+          toolResults['Impact Analyzer'] = { summary: '⚠️ Failed to run Impact Analyzer: ' + (err.message || 'Unknown error') };
+        }
       }
       if (toolsToUse.includes('code_assistant') && selectedPagesFromAI.length > 0) {
-        const res = await safeToolCall('Code Assistant', async () =>
-          apiService.codeAssistant({
+        try {
+          const res = await apiService.codeAssistant({
             space_key: selectedSpace,
             page_title: selectedPagesFromAI[0],
             instruction: usedGoal,
-          })
-        );
-        if (res) toolResults['Code Assistant'] = res;
+          });
+          toolResults['Code Assistant'] = res;
+        } catch (err: any) {
+          toolResults['Code Assistant'] = { summary: '⚠️ Failed to run Code Assistant: ' + (err.message || 'Unknown error') };
+        }
       }
       if (toolsToUse.includes('video_summarizer') && selectedPagesFromAI.length > 0) {
-        const res = await safeToolCall('Video Summarizer', async () =>
-          apiService.videoSummarizer({
+        try {
+          const res = await apiService.videoSummarizer({
             space_key: selectedSpace,
             page_title: selectedPagesFromAI[0],
-          })
-        );
-        if (res) toolResults['Video Summarizer'] = res;
+          });
+          toolResults['Video Summarizer'] = res;
+        } catch (err: any) {
+          toolResults['Video Summarizer'] = { summary: '⚠️ Failed to run Video Summarizer: ' + (err.message || 'Unknown error') };
+        }
       }
       if (toolsToUse.includes('test_support') && selectedPagesFromAI.length > 0) {
-        const res = await safeToolCall('Test Support', async () =>
-          apiService.testSupport({
+        try {
+          const res = await apiService.testSupport({
             space_key: selectedSpace,
             code_page_title: selectedPagesFromAI[0],
-          })
-        );
-        if (res) toolResults['Test Support'] = res;
+          });
+          toolResults['Test Support'] = res;
+        } catch (err: any) {
+          toolResults['Test Support'] = { summary: '⚠️ Failed to run Test Support: ' + (err.message || 'Unknown error') };
+        }
       }
       if (toolsToUse.includes('image_insights') && selectedPagesFromAI.length > 0) {
-        const images = await safeToolCall('Image Fetch', async () => apiService.getImages(selectedSpace, selectedPagesFromAI[0]));
-        if (images && images.images && images.images.length > 0) {
-          const summaries = await Promise.all(images.images.map((imgUrl: string) => safeToolCall('Image Summary', async () =>
-            apiService.imageSummary({
+        try {
+          const images = await apiService.getImages(selectedSpace, selectedPagesFromAI[0]);
+          if (images && images.images && images.images.length > 0) {
+            const summaries = await Promise.all(images.images.map((imgUrl: string) => apiService.imageSummary({
               space_key: selectedSpace,
               page_title: selectedPagesFromAI[0],
               image_url: imgUrl,
-            })
-          )));
-          toolResults['Image Insights'] = summaries.filter(Boolean);
+            })));
+            toolResults['Image Insights'] = summaries;
+          }
+        } catch (err: any) {
+          toolResults['Image Insights'] = { summary: '⚠️ Failed to run Image Insights: ' + (err.message || 'Unknown error') };
         }
       }
       if (toolsToUse.includes('chart_builder') && selectedPagesFromAI.length > 0) {
-        const images = await safeToolCall('Image Fetch', async () => apiService.getImages(selectedSpace, selectedPagesFromAI[0]));
-        if (images && images.images && images.images.length > 0) {
-          const charts = await Promise.all(images.images.map((imgUrl: string) => safeToolCall('Chart Builder', async () =>
-            apiService.createChart({
+        try {
+          const images = await apiService.getImages(selectedSpace, selectedPagesFromAI[0]);
+          if (images && images.images && images.images.length > 0) {
+            const charts = await Promise.all(images.images.map((imgUrl: string) => apiService.createChart({
               space_key: selectedSpace,
               page_title: selectedPagesFromAI[0],
               image_url: imgUrl,
               chart_type: 'bar',
               filename: 'chart',
               format: 'png',
-            })
-          )));
-          toolResults['Chart Builder'] = charts.filter(Boolean);
+            })));
+            toolResults['Chart Builder'] = charts;
+          }
+        } catch (err: any) {
+          toolResults['Chart Builder'] = { summary: '⚠️ Failed to run Chart Builder: ' + (err.message || 'Unknown error') };
         }
       }
       setPlanSteps((steps) => steps.map((s) => s.id === 2 ? { ...s, status: 'completed' } : s));
@@ -256,33 +252,43 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
       const finalAnswer = Object.values(toolResults).map(getRelevantOutput).filter(Boolean).join('\n\n');
       // Prepare output tabs
       const pageOutputs: Record<string, string> = {};
-      selectedPagesFromAI.forEach((page: string) => {
-        // Try to get output for this page from toolResults
-        let output = '';
-        // Try to find a result for this page in toolResults
-        for (const key in toolResults) {
-          const result = toolResults[key];
-          if (Array.isArray(result)) {
-            // If result is an array, try to find an object with page_title or similar
-            const found = result.find((r: any) => r && (r.page_title === page || r.title === page));
-            if (found) {
-              output = getRelevantOutput(found);
-              break;
-            }
-          } else if (result && (result.page_title === page || result.title === page)) {
-            output = getRelevantOutput(result);
-            break;
+      
+      // Create individual outputs for each selected page
+      for (const page of selectedPagesFromAI) {
+        let pageOutput = '';
+        
+        // Try to get page-specific output by calling search for this specific page
+        try {
+          const pageSpecificResult = await apiService.search({
+            space_key: selectedSpace,
+            page_titles: [page],
+            query: usedGoal,
+          });
+          
+          if (pageSpecificResult && pageSpecificResult.response) {
+            pageOutput = `## Analysis for "${page}"\n\n${pageSpecificResult.response}`;
+          } else {
+            // Fallback to general results
+            pageOutput = `## Analysis for "${page}"\n\n${finalAnswer}`;
           }
+        } catch (err) {
+          // If page-specific search fails, use general results
+          pageOutput = `## Analysis for "${page}"\n\n${finalAnswer}`;
         }
-        if (!output) output = getRelevantOutput(toolResults['AI Powered Search']); // fallback
-        pageOutputs[page] = output;
-      });
+        
+        pageOutputs[page] = pageOutput;
+      }
+      
+      // If no pages were processed, create a general output
+      if (Object.keys(pageOutputs).length === 0) {
+        pageOutputs['General Analysis'] = finalAnswer;
+      }
       const tabs = [
         {
           id: 'final-answer',
           label: 'Final Answer',
           icon: FileText,
-          content: finalAnswer, // Use the summary as fallback
+          content: '', // We'll render this in JSX below
           pageOutputs,
         },
         {
@@ -308,14 +314,12 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
       setActiveTab('final-answer');
       setSelectedFinalPage(selectedPagesFromAI[0] || null);
     } catch (err: any) {
-      if (err.message && err.message.includes('Failed to fetch')) {
-        setError('Network error: Unable to reach the server. Please check your connection and try again.');
-      } else {
-        setError(err.message || 'An error occurred during orchestration.');
-      }
+      setError(err.message || 'An error occurred during orchestration.');
     } finally {
       setIsPlanning(false);
     }
+  };
+
   const executeSteps = async (steps: PlanStep[]) => {
     setIsExecuting(true);
     
