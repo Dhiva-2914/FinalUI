@@ -690,7 +690,12 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
               {/* Results Area */}
               {planSteps.length > 0 && (
                 <div className="w-full">
-                  {outputTabs.length > 0 && (
+                  {error ? (
+                    <div className="bg-white/60 backdrop-blur-xl rounded-xl border border-white/20 shadow-lg overflow-hidden p-8 text-center">
+                      <h2 className="text-xl font-bold text-red-600 mb-2">Failed to analyze the goal</h2>
+                      <p className="text-gray-700">{error}</p>
+                    </div>
+                  ) : outputTabs.length > 0 ? (
                     <div className="bg-white/60 backdrop-blur-xl rounded-xl border border-white/20 shadow-lg overflow-hidden">
                       {/* Tab Headers */}
                       <div className="border-b border-white/20 bg-white/40 backdrop-blur-sm">
@@ -778,7 +783,7 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
                         )}
                       </div>
                     </div>
-                  )}
+                  ) : null}
                 </div>
               )}
               {/* Actions */}
