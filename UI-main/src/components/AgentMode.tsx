@@ -210,27 +210,37 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
       const finalAnswer = Object.values(toolResults).map(getRelevantOutput).filter(Boolean).join('\n\n');
       // Prepare output tabs
       const pageOutputs: Record<string, string> = {};
-      selectedPagesFromAI.forEach((page: string) => {
-        // Try to get output for this page from toolResults
-        let output = '';
-        // Try to find a result for this page in toolResults
-        for (const key in toolResults) {
-          const result = toolResults[key];
-          if (Array.isArray(result)) {
-            // If result is an array, try to find an object with page_title or similar
-            const found = result.find((r: any) => r && (r.page_title === page || r.title === page));
-            if (found) {
-              output = getRelevantOutput(found);
-              break;
-            }
-          } else if (result && (result.page_title === page || result.title === page)) {
-            output = getRelevantOutput(result);
-            break;
+      
+      // Create individual outputs for each selected page
+      for (const page of selectedPagesFromAI) {
+        let pageOutput = '';
+        
+        // Try to get page-specific output by calling search for this specific page
+        try {
+          const pageSpecificResult = await apiService.search({
+            space_key: selectedSpace,
+            page_titles: [page],
+            query: usedGoal,
+          });
+          
+          if (pageSpecificResult && pageSpecificResult.response) {
+            pageOutput = `## Analysis for "${page}"\n\n${pageSpecificResult.response}`;
+          } else {
+            // Fallback to general results
+            pageOutput = `## Analysis for "${page}"\n\n${finalAnswer}`;
           }
+        } catch (err) {
+          // If page-specific search fails, use general results
+          pageOutput = `## Analysis for "${page}"\n\n${finalAnswer}`;
         }
-        if (!output) output = getRelevantOutput(toolResults['AI Powered Search']); // fallback
-        pageOutputs[page] = output;
-      });
+        
+        pageOutputs[page] = pageOutput;
+      }
+      
+      // If no pages were processed, create a general output
+      if (Object.keys(pageOutputs).length === 0) {
+        pageOutputs['General Analysis'] = finalAnswer;
+      }
       const tabs = [
         {
           id: 'final-answer',
