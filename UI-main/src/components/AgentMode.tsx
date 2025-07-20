@@ -551,6 +551,102 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
     currentStep === 0 ? 0 :
     currentStep === 1 ? 50 : 100;
 
+  // Function to format content based on type
+  const formatContent = (content: string) => {
+    if (!content) return <p>No content available.</p>;
+    
+    // Check for code blocks
+    if (content.includes('```')) {
+      const parts = content.split('```');
+      return (
+        <div>
+          {parts.map((part, index) => {
+            if (index % 2 === 0) {
+              // Regular text
+              return formatMarkdown(part);
+            } else {
+              // Code block
+              const lines = part.split('\n');
+              const language = lines[0].trim();
+              const code = lines.slice(1).join('\n').trim();
+              
+              if (language === 'json') {
+                try {
+                  const parsed = JSON.parse(code);
+                  return (
+                    <pre key={index} className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto my-4">
+                      <code className="language-json">
+                        {JSON.stringify(parsed, null, 2)}
+                      </code>
+                    </pre>
+                  );
+                } catch (e) {
+                  return (
+                    <pre key={index} className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto my-4">
+                      <code>{code}</code>
+                    </pre>
+                  );
+                }
+              } else {
+                return (
+                  <pre key={index} className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto my-4">
+                    <code className={`language-${language}`}>
+                      {code}
+                    </code>
+                  </pre>
+                );
+              }
+            }
+          })}
+        </div>
+      );
+    }
+    
+    // Check if content looks like JSON
+    if (content.trim().startsWith('{') || content.trim().startsWith('[')) {
+      try {
+        const parsed = JSON.parse(content);
+        return (
+          <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto my-4">
+            <code className="language-json">
+              {JSON.stringify(parsed, null, 2)}
+            </code>
+          </pre>
+        );
+      } catch (e) {
+        // Not valid JSON, treat as regular content
+      }
+    }
+    
+    // Format as markdown
+    return formatMarkdown(content);
+  };
+  
+  // Function to format markdown content
+  const formatMarkdown = (content: string) => {
+    return content.split('\n').map((line, index) => {
+      if (line.startsWith('### ')) {
+        return <h3 key={index} className="text-lg font-bold text-gray-800 mt-4 mb-2">{line.substring(4)}</h3>;
+      } else if (line.startsWith('## ')) {
+        return <h2 key={index} className="text-xl font-bold text-gray-800 mt-6 mb-3">{line.substring(3)}</h2>;
+      } else if (line.startsWith('# ')) {
+        return <h1 key={index} className="text-2xl font-bold text-gray-800 mt-8 mb-4">{line.substring(2)}</h1>;
+      } else if (line.startsWith('- **')) {
+        const match = line.match(/- \*\*(.*?)\*\*: (.*)/);
+        if (match) {
+          return <p key={index} className="mb-2"><strong>{match[1]}:</strong> {match[2]}</p>;
+        }
+      } else if (line.startsWith('- ')) {
+        return <p key={index} className="mb-1 ml-4">• {line.substring(2)}</p>;
+      } else if (line.startsWith('* ')) {
+        return <p key={index} className="mb-1 ml-4">• {line.substring(2)}</p>;
+      } else if (line.trim()) {
+        return <p key={index} className="mb-2 text-gray-700">{line}</p>;
+      }
+      return <br key={index} />;
+    });
+  };
+
   return (
     <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-40 p-4">
       <div className="bg-white/80 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
@@ -578,48 +674,6 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
           </div>
         </div>
         <div className="flex flex-1 min-h-0">
-          {/* Live Progress Log - moved to left top, disappears when results are shown */}
-          {planSteps.length > 0 && outputTabs.length === 0 && (
-            <div className="w-full max-w-xs bg-white/90 border-r border-white/20 flex flex-col p-4 space-y-6 relative z-10 h-full">
-              <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg">
-                <h3 className="font-semibold text-gray-800 mb-4">Live Progress Log</h3>
-                <div className="space-y-4">
-                  {planSteps.map((step, index) => (
-                    <div key={step.id} className="flex items-start space-x-3">
-                      <div className="flex-shrink-0 mt-1">
-                        {step.status === 'completed' ? (
-                          <CheckCircle className="w-5 h-5 text-green-500" />
-                        ) : step.status === 'running' ? (
-                          <Loader2 className="w-5 h-5 text-orange-500 animate-spin" />
-                        ) : (
-                          <div className="w-5 h-5 border-2 border-gray-300 rounded-full" />
-                        )}
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-medium text-gray-800">{step.title}</div>
-                        {step.details && (
-                          <div className="text-sm text-gray-600 mt-1">{step.details}</div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                {/* Progress Bar */}
-                <div className="mt-6">
-                  <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
-                    <span>Progress</span>
-                    <span>{progressPercent}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-orange-500 h-2 rounded-full transition-all duration-500"
-                      style={{ width: `${progressPercent}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
           {/* Sidebar */}
           {sidebarOpen && (
             <div className="w-full max-w-xs bg-white/90 border-r border-white/20 flex flex-col p-4 space-y-6 relative z-10 h-full">
@@ -747,41 +801,86 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
             <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)] flex-1">
               {/* Before results: selectors and goal input as before */}
               {planSteps.length === 0 && !isPlanning && (
-                <div className="max-w-4xl mx-auto mb-6 sticky top-0 z-30">
-                  <div className="bg-white/60 backdrop-blur-xl rounded-xl p-6 border border-white/20 shadow-lg text-center">
-                    <h3 className="text-xl font-bold text-gray-800 mb-4">Select Space and Pages</h3>
-                    <div className="flex flex-col md:flex-row md:space-x-4 items-center justify-center mb-4">
-                      <div className="mb-4 md:mb-0 w-full md:w-1/2">
-                        <label className="block text-gray-700 mb-2 text-left">Space</label>
-                        <Select
-                          classNamePrefix="react-select"
-                          options={spaces.map(space => ({ value: space.key, label: `${space.name} (${space.key})` }))}
-                          value={spaces.find(s => s.key === selectedSpace) ? { value: selectedSpace, label: `${spaces.find(s => s.key === selectedSpace)?.name} (${selectedSpace})` } : null}
-                          onChange={option => {
-                            setSelectedSpace(option ? option.value : '');
-                            setSelectedPages([]);
-                          }}
-                          placeholder="Select a space..."
-                          isClearable
-                        />
-                      </div>
-                      <div className="w-full md:w-1/2">
-                        <label className="block text-gray-700 mb-2 text-left">Pages</label>
-                        <Select
-                          classNamePrefix="react-select"
-                          isMulti
-                          isSearchable
-                          isDisabled={!selectedSpace}
-                          options={pages.map(page => ({ value: page, label: page }))}
-                          value={selectedPages.map(page => ({ value: page, label: page }))}
-                          onChange={options => setSelectedPages(options ? options.map(opt => opt.value) : [])}
-                          placeholder={selectedSpace ? "Type or select pages..." : "Select a space first"}
-                          closeMenuOnSelect={false}
-                        />
-                        <div className="text-xs text-gray-500 mt-1 text-left">Type to search and select multiple pages.</div>
+                <div className="max-w-6xl mx-auto mb-6 sticky top-0 z-30">
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Select Space and Pages - Left Column */}
+                    <div className="lg:col-span-2">
+                      <div className="bg-white/60 backdrop-blur-xl rounded-xl p-6 border border-white/20 shadow-lg text-center">
+                        <h3 className="text-xl font-bold text-gray-800 mb-4">Select Space and Pages</h3>
+                        <div className="flex flex-col md:flex-row md:space-x-4 items-center justify-center mb-4">
+                          <div className="mb-4 md:mb-0 w-full md:w-1/2">
+                            <label className="block text-gray-700 mb-2 text-left">Space</label>
+                            <Select
+                              classNamePrefix="react-select"
+                              options={spaces.map(space => ({ value: space.key, label: `${space.name} (${space.key})` }))}
+                              value={spaces.find(s => s.key === selectedSpace) ? { value: selectedSpace, label: `${spaces.find(s => s.key === selectedSpace)?.name} (${selectedSpace})` } : null}
+                              onChange={option => {
+                                setSelectedSpace(option ? option.value : '');
+                                setSelectedPages([]);
+                              }}
+                              placeholder="Select a space..."
+                              isClearable
+                            />
+                          </div>
+                          <div className="w-full md:w-1/2">
+                            <label className="block text-gray-700 mb-2 text-left">Pages</label>
+                            <Select
+                              classNamePrefix="react-select"
+                              isMulti
+                              isSearchable
+                              isDisabled={!selectedSpace}
+                              options={pages.map(page => ({ value: page, label: page }))}
+                              value={selectedPages.map(page => ({ value: page, label: page }))}
+                              onChange={options => setSelectedPages(options ? options.map(opt => opt.value) : [])}
+                              placeholder={selectedSpace ? "Type or select pages..." : "Select a space first"}
+                              closeMenuOnSelect={false}
+                            />
+                            <div className="text-xs text-gray-500 mt-1 text-left">Type to search and select multiple pages.</div>
+                          </div>
+                        </div>
+                        {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
                       </div>
                     </div>
-                    {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
+                    {/* Live Progress Log - Right Column */}
+                    <div className="lg:col-span-1">
+                      <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg">
+                        <h3 className="font-semibold text-gray-800 mb-4">Live Progress Log</h3>
+                        <div className="space-y-4">
+                          {planSteps.map((step, index) => (
+                            <div key={step.id} className="flex items-start space-x-3">
+                              <div className="flex-shrink-0 mt-1">
+                                {step.status === 'completed' ? (
+                                  <CheckCircle className="w-5 h-5 text-green-500" />
+                                ) : step.status === 'running' ? (
+                                  <Loader2 className="w-5 h-5 text-orange-500 animate-spin" />
+                                ) : (
+                                  <div className="w-5 h-5 border-2 border-gray-300 rounded-full" />
+                                )}
+                              </div>
+                              <div className="flex-1">
+                                <div className="font-medium text-gray-800">{step.title}</div>
+                                {step.details && (
+                                  <div className="text-sm text-gray-600 mt-1">{step.details}</div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        {/* Progress Bar */}
+                        <div className="mt-6">
+                          <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
+                            <span>Progress</span>
+                            <span>{progressPercent}%</span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div 
+                              className="bg-orange-500 h-2 rounded-full transition-all duration-500"
+                              style={{ width: `${progressPercent}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -860,51 +959,15 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
                                 <div className="whitespace-pre-wrap text-gray-700">
                                   {(() => {
                                     const content = outputTabs.find(tab => tab.id === 'final-answer').pageOutputs[selectedFinalPage || Object.keys(outputTabs.find(tab => tab.id === 'final-answer').pageOutputs)[0]] || 'No output for this page.';
-                                    // Format content like in tool mode
-                                    return content.split('\n').map((line, index) => {
-                                      if (line.startsWith('### ')) {
-                                        return <h3 key={index} className="text-lg font-bold text-gray-800 mt-4 mb-2">{line.substring(4)}</h3>;
-                                      } else if (line.startsWith('## ')) {
-                                        return <h2 key={index} className="text-xl font-bold text-gray-800 mt-6 mb-3">{line.substring(3)}</h2>;
-                                      } else if (line.startsWith('# ')) {
-                                        return <h1 key={index} className="text-2xl font-bold text-gray-800 mt-8 mb-4">{line.substring(2)}</h1>;
-                                      } else if (line.startsWith('- **')) {
-                                        const match = line.match(/- \*\*(.*?)\*\*: (.*)/);
-                                        if (match) {
-                                          return <p key={index} className="mb-2"><strong>{match[1]}:</strong> {match[2]}</p>;
-                                        }
-                                      } else if (line.startsWith('- ')) {
-                                        return <p key={index} className="mb-1 ml-4">• {line.substring(2)}</p>;
-                                      } else if (line.trim()) {
-                                        return <p key={index} className="mb-2 text-gray-700">{line}</p>;
-                                      }
-                                      return <br key={index} />;
-                                    });
+                                    // Format content based on type
+                                    return formatContent(content);
                                   })()}
                                 </div>
                               </div>
                             ) : (
                               // Other tabs or fallback
                               <div className="whitespace-pre-wrap text-gray-700">
-                                {outputTabs.find(tab => tab.id === activeTab)?.content.split('\n').map((line, index) => {
-                                  if (line.startsWith('### ')) {
-                                    return <h3 key={index} className="text-lg font-bold text-gray-800 mt-4 mb-2">{line.substring(4)}</h3>;
-                                  } else if (line.startsWith('## ')) {
-                                    return <h2 key={index} className="text-xl font-bold text-gray-800 mt-6 mb-3">{line.substring(3)}</h2>;
-                                  } else if (line.startsWith('# ')) {
-                                    return <h1 key={index} className="text-2xl font-bold text-gray-800 mt-8 mb-4">{line.substring(2)}</h1>;
-                                  } else if (line.startsWith('- **')) {
-                                    const match = line.match(/- \*\*(.*?)\*\*: (.*)/);
-                                    if (match) {
-                                      return <p key={index} className="mb-2"><strong>{match[1]}:</strong> {match[2]}</p>;
-                                    }
-                                  } else if (line.startsWith('- ')) {
-                                    return <p key={index} className="mb-1 ml-4">• {line.substring(2)}</p>;
-                                  } else if (line.trim()) {
-                                    return <p key={index} className="mb-2 text-gray-700">{line}</p>;
-                                  }
-                                  return <br key={index} />;
-                                })}
+                                {formatContent(outputTabs.find(tab => tab.id === activeTab)?.content || '')}
                               </div>
                             )}
                           </div>
