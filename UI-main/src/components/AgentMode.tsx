@@ -259,6 +259,7 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
         let aiSearchOutput = '';
         let videoSummaryOutput = '';
         let graphOutput = '';
+        let pageErrors: string[] = [];
         
         // Check what the instruction mentions to determine what results to include
         const instruction = usedGoal.toLowerCase();
@@ -278,7 +279,8 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
               aiSearchOutput = `### AI Search Result\n${pageSpecificResult.response}`;
             }
           } catch (err) {
-            // ignore, fallback below
+            pageErrors.push(`Search failed: ${err.message || 'Unknown error'}`);
+            console.error(`Search failed for page ${page}:`, err);
           }
         }
         
@@ -293,7 +295,8 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
               videoSummaryOutput = `### Video Summary\n${videoResult.summary}`;
             }
           } catch (err) {
-            // ignore, fallback below
+            pageErrors.push(`Video summary failed: ${err.message || 'Unknown error'}`);
+            console.error(`Video summary failed for page ${page}:`, err);
           }
         }
         
@@ -309,24 +312,62 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
               else if (instruction.includes('scatter')) chartType = 'scatter';
               else if (instruction.includes('area')) chartType = 'area';
               
-              const chartPromises = images.images.map((imgUrl: string) => 
-                apiService.createChart({
-                  space_key: selectedSpace,
-                  page_title: page,
-                  image_url: imgUrl,
-                  chart_type: chartType,
-                  filename: `chart_${page.replace(/\s+/g, '_')}`,
-                  format: 'png',
-                })
-              );
+              // Process each image to create chart
+              const chartPromises = images.images.map(async (imgUrl: string, index: number) => {
+                try {
+                  const chartResult = await apiService.createChart({
+                    space_key: selectedSpace,
+                    page_title: page,
+                    image_url: imgUrl,
+                    chart_type: chartType,
+                    filename: `chart_${page.replace(/\s+/g, '_')}_${index + 1}`,
+                    format: 'png',
+                  });
+                  
+                  // Also get image insights for context
+                  const imageInsight = await apiService.imageSummary({
+                    space_key: selectedSpace,
+                    page_title: page,
+                    image_url: imgUrl,
+                  });
+                  
+                  return {
+                    chart: chartResult,
+                    insight: imageInsight,
+                    imageUrl: imgUrl,
+                    chartType: chartType,
+                    index: index + 1
+                  };
+                } catch (err) {
+                  console.error(`Failed to process image ${index + 1} for page ${page}:`, err);
+                  return null;
+                }
+              });
               
               const chartResults = await Promise.all(chartPromises);
-              if (chartResults.length > 0) {
-                graphOutput = `### Graph Conversion\nConverted ${chartResults.length} image(s) to ${chartType} chart(s).\n\nGenerated charts:\n${chartResults.map((result, index) => `- Chart ${index + 1}: ${result.chart_url || 'Chart generated successfully'}`).join('\n')}`;
+              const successfulResults = chartResults.filter(result => result !== null);
+              
+              if (successfulResults.length > 0) {
+                graphOutput = `### Graph Creation Results\n\n**Page:** ${page}\n**Chart Type:** ${chartType}\n**Images Processed:** ${successfulResults.length}/${images.images.length}\n\n`;
+                
+                successfulResults.forEach((result, index) => {
+                  graphOutput += `#### Chart ${result.index}\n`;
+                  graphOutput += `**Image Analysis:** ${result.insight?.summary || 'Analysis not available'}\n\n`;
+                  graphOutput += `**Generated Chart:** ${result.chart?.chart_url || 'Chart URL not available'}\n\n`;
+                  if (result.chart?.chart_data) {
+                    graphOutput += `**Chart Data:**\n\`\`\`json\n${JSON.stringify(result.chart.chart_data, null, 2)}\n\`\`\`\n\n`;
+                  }
+                  graphOutput += `---\n\n`;
+                });
+              } else {
+                graphOutput = `### Graph Creation\n\n**Page:** ${page}\n**Status:** Failed to process any images\n**Error:** All image processing attempts failed\n\n`;
               }
+            } else {
+              graphOutput = `### Graph Creation\n\n**Page:** ${page}\n**Status:** No images found on this page\n\n`;
             }
           } catch (err) {
-            // ignore, fallback below
+            pageErrors.push(`Graph creation failed: ${err.message || 'Unknown error'}`);
+            console.error(`Failed to process images for page ${page}:`, err);
           }
         }
         
@@ -335,7 +376,12 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
         if (outputs.length > 0) {
           pageOutput = outputs.join('\n\n');
         } else {
-          pageOutput = `No relevant results found for "${page}" based on your instruction.`;
+          pageOutput = `### Analysis for "${page}"\n\n**Status:** No relevant results found based on your instruction.\n\n`;
+        }
+        
+        // Add error summary if there were any errors
+        if (pageErrors.length > 0) {
+          pageOutput += `\n### Errors Encountered\n\n${pageErrors.map(error => `- ${error}`).join('\n')}\n\n`;
         }
         
         pageOutputs[page] = pageOutput;
