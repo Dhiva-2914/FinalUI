@@ -139,37 +139,37 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
       // Run each tool, but catch errors individually and add warnings instead of aborting the whole process
       if (toolsToUse.includes('ai_powered_search')) {
         try {
-          const res = await apiService.search({
-            space_key: selectedSpace,
-            page_titles: selectedPagesFromAI,
+        const res = await apiService.search({
+          space_key: selectedSpace,
+          page_titles: selectedPagesFromAI,
             query: usedGoal,
-          });
-          toolResults['AI Powered Search'] = res;
+        });
+        toolResults['AI Powered Search'] = res;
         } catch (err: any) {
           toolResults['AI Powered Search'] = { summary: '⚠️ Failed to run AI Powered Search: ' + (err.message || 'Unknown error') };
         }
       }
       if (toolsToUse.includes('impact_analyzer') && selectedPagesFromAI.length >= 2) {
         try {
-          const res = await apiService.impactAnalyzer({
-            space_key: selectedSpace,
-            old_page_title: selectedPagesFromAI[0],
-            new_page_title: selectedPagesFromAI[1],
+        const res = await apiService.impactAnalyzer({
+          space_key: selectedSpace,
+          old_page_title: selectedPagesFromAI[0],
+          new_page_title: selectedPagesFromAI[1],
             question: usedGoal,
-          });
-          toolResults['Impact Analyzer'] = res;
+        });
+        toolResults['Impact Analyzer'] = res;
         } catch (err: any) {
           toolResults['Impact Analyzer'] = { summary: '⚠️ Failed to run Impact Analyzer: ' + (err.message || 'Unknown error') };
         }
       }
       if (toolsToUse.includes('code_assistant') && selectedPagesFromAI.length > 0) {
         try {
-          const res = await apiService.codeAssistant({
-            space_key: selectedSpace,
-            page_title: selectedPagesFromAI[0],
+        const res = await apiService.codeAssistant({
+          space_key: selectedSpace,
+          page_title: selectedPagesFromAI[0],
             instruction: usedGoal,
-          });
-          toolResults['Code Assistant'] = res;
+        });
+        toolResults['Code Assistant'] = res;
         } catch (err: any) {
           toolResults['Code Assistant'] = { summary: '⚠️ Failed to run Code Assistant: ' + (err.message || 'Unknown error') };
         }
@@ -177,35 +177,35 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
       if (toolsToUse.includes('video_summarizer') && selectedPagesFromAI.length > 0) {
         try {
           const res: any = await apiService.videoSummarizer({
-            space_key: selectedSpace,
-            page_title: selectedPagesFromAI[0],
-          });
-          toolResults['Video Summarizer'] = res;
+          space_key: selectedSpace,
+          page_title: selectedPagesFromAI[0],
+        });
+        toolResults['Video Summarizer'] = res;
         } catch (err: any) {
           toolResults['Video Summarizer'] = { summary: '⚠️ Failed to run Video Summarizer: ' + (err.message || 'Unknown error') };
         }
       }
       if (toolsToUse.includes('test_support') && selectedPagesFromAI.length > 0) {
         try {
-          const res = await apiService.testSupport({
-            space_key: selectedSpace,
-            code_page_title: selectedPagesFromAI[0],
-          });
-          toolResults['Test Support'] = res;
+        const res = await apiService.testSupport({
+          space_key: selectedSpace,
+          code_page_title: selectedPagesFromAI[0],
+        });
+        toolResults['Test Support'] = res;
         } catch (err: any) {
           toolResults['Test Support'] = { summary: '⚠️ Failed to run Test Support: ' + (err.message || 'Unknown error') };
         }
       }
       if (toolsToUse.includes('image_insights') && selectedPagesFromAI.length > 0) {
         try {
-          const images = await apiService.getImages(selectedSpace, selectedPagesFromAI[0]);
-          if (images && images.images && images.images.length > 0) {
-            const summaries = await Promise.all(images.images.map((imgUrl: string) => apiService.imageSummary({
-              space_key: selectedSpace,
-              page_title: selectedPagesFromAI[0],
-              image_url: imgUrl,
-            })));
-            toolResults['Image Insights'] = summaries;
+        const images = await apiService.getImages(selectedSpace, selectedPagesFromAI[0]);
+        if (images && images.images && images.images.length > 0) {
+          const summaries = await Promise.all(images.images.map((imgUrl: string) => apiService.imageSummary({
+            space_key: selectedSpace,
+            page_title: selectedPagesFromAI[0],
+            image_url: imgUrl,
+          })));
+          toolResults['Image Insights'] = summaries;
           }
         } catch (err: any) {
           toolResults['Image Insights'] = { summary: '⚠️ Failed to run Image Insights: ' + (err.message || 'Unknown error') };
@@ -213,17 +213,17 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
       }
       if (toolsToUse.includes('chart_builder') && selectedPagesFromAI.length > 0) {
         try {
-          const images = await apiService.getImages(selectedSpace, selectedPagesFromAI[0]);
-          if (images && images.images && images.images.length > 0) {
-            const charts = await Promise.all(images.images.map((imgUrl: string) => apiService.createChart({
-              space_key: selectedSpace,
-              page_title: selectedPagesFromAI[0],
-              image_url: imgUrl,
-              chart_type: 'bar',
-              filename: 'chart',
-              format: 'png',
-            })));
-            toolResults['Chart Builder'] = charts;
+        const images = await apiService.getImages(selectedSpace, selectedPagesFromAI[0]);
+        if (images && images.images && images.images.length > 0) {
+          const charts = await Promise.all(images.images.map((imgUrl: string) => apiService.createChart({
+            space_key: selectedSpace,
+            page_title: selectedPagesFromAI[0],
+            image_url: imgUrl,
+            chart_type: 'bar',
+            filename: 'chart',
+            format: 'png',
+          })));
+          toolResults['Chart Builder'] = charts;
           }
         } catch (err: any) {
           toolResults['Chart Builder'] = { summary: '⚠️ Failed to run Chart Builder: ' + (err.message || 'Unknown error') };
@@ -549,9 +549,7 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
   // Calculate progress percentage based on current step
   const progressPercent = planSteps.length === 0 ? 0 :
     currentStep === 0 ? 0 :
-    currentStep === 1 && planSteps[0]?.status === 'completed' ? 50 :
-    currentStep >= planSteps.length - 1 ? 100 :
-    Math.round(((currentStep + 1) / planSteps.length) * 100);
+    currentStep === 1 ? 50 : 100;
 
   return (
     <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-40 p-4">
@@ -569,7 +567,7 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
             <div className="flex items-center space-x-2">
               <button 
                 onClick={() => onModeSelect('tool')}
-                className="text-orange-100 hover:text-white hover:bg-white/10 rounded-lg px-3 py-1 text-sm transition-colors"
+                className="text-orange-100 hover:text-white hover:bg-white/10 rounded-xl px-3 py-1 text-sm transition-colors"
               >
                 Switch to Tool Mode
               </button>
@@ -626,7 +624,7 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
           {sidebarOpen && (
             <div className="w-full max-w-xs bg-white/90 border-r border-white/20 flex flex-col p-4 space-y-6 relative z-10 h-full">
               <button
-                className="absolute left-0 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-orange-500 bg-white rounded-r-lg px-2 py-1 shadow-lg"
+                className="absolute left-0 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-orange-500 bg-white rounded-r-xl px-2 py-1 shadow-lg"
                 onClick={() => setSidebarOpen(false)}
                 title="Close sidebar"
                 style={{ zIndex: 20 }}
@@ -667,7 +665,7 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
                 </div>
                 {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
               </div>
-              {/* Live Progress Log - in row with selectors, faded when output appears */}
+              {/* Live Progress Log - moved to right of selectors, fades when output appears */}
               {planSteps.length > 0 && (
                 <div className={`bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg transition-opacity duration-500 ${outputTabs.length > 0 ? 'opacity-50' : 'opacity-100'}`}>
                   <h3 className="font-semibold text-gray-800 mb-4">Live Progress Log</h3>
@@ -737,7 +735,7 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
           {/* Sidebar closed, show open button if results are present */}
           {!sidebarOpen && (
             <button
-              className="absolute left-0 top-1/2 transform -translate-y-1/2 bg-orange-500 text-white rounded-r-lg px-2 py-1 z-20 shadow-lg hover:bg-orange-600"
+              className="absolute left-0 top-1/2 transform -translate-y-1/2 bg-orange-500 text-white rounded-r-xl px-2 py-1 z-20 shadow-lg hover:bg-orange-600"
               onClick={() => setSidebarOpen(true)}
               title="Open sidebar"
             >
