@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Select from 'react-select';
-import { Zap, X, Send, Download, RotateCcw, FileText, Brain, CheckCircle, Loader2, MessageSquare, Plus, LayoutSidebar } from 'lucide-react';
+import { Zap, X, Send, Download, RotateCcw, FileText, Brain, CheckCircle, Loader2, MessageSquare, Plus, PanelLeftClose } from 'lucide-react';
 import type { AppMode } from '../App';
 import { apiService, analyzeGoal } from '../services/api';
 
@@ -628,7 +628,7 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
                 title="Close sidebar"
                 style={{ zIndex: 20 }}
               >
-                <LayoutSidebar className="w-6 h-6" />
+                <PanelLeftClose className="w-6 h-6" />
               </button>
               {/* Space and Page Selectors */}
               <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg">
@@ -698,7 +698,7 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
               onClick={() => setSidebarOpen(true)}
               title="Open sidebar"
             >
-              <LayoutSidebar className="w-5 h-5" />
+              <PanelLeftClose className="w-5 h-5" />
             </button>
           )}
           {/* Main Content */}
