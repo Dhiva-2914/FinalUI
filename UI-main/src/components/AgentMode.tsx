@@ -258,11 +258,13 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
         let pageOutput = '';
         let aiSearchOutput = '';
         let videoSummaryOutput = '';
+        let graphOutput = '';
         
         // Check what the instruction mentions to determine what results to include
         const instruction = usedGoal.toLowerCase();
         const shouldIncludeSearch = instruction.includes('search') || instruction.includes('find') || instruction.includes('analyze') || instruction.includes('content') || !instruction.includes('video');
         const shouldIncludeVideo = instruction.includes('video') || instruction.includes('summarize') || instruction.includes('summary');
+        const shouldIncludeGraph = instruction.includes('graph') || instruction.includes('chart') || instruction.includes('convert') || instruction.includes('visualize');
         
         // Try to get page-specific output by calling search for this specific page
         if (shouldIncludeSearch) {
@@ -295,12 +297,43 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
           }
         }
         
-        if (aiSearchOutput && videoSummaryOutput) {
-          pageOutput = aiSearchOutput + '\n\n' + videoSummaryOutput;
-        } else if (aiSearchOutput) {
-          pageOutput = aiSearchOutput;
-        } else if (videoSummaryOutput) {
-          pageOutput = videoSummaryOutput;
+        // Try to convert images to graphs if instruction mentions it
+        if (shouldIncludeGraph && toolsToUse.includes('chart_builder')) {
+          try {
+            const images = await apiService.getImages(selectedSpace, page);
+            if (images && images.images && images.images.length > 0) {
+              // Determine chart type from instruction
+              let chartType = 'bar';
+              if (instruction.includes('pie')) chartType = 'pie';
+              else if (instruction.includes('line')) chartType = 'line';
+              else if (instruction.includes('scatter')) chartType = 'scatter';
+              else if (instruction.includes('area')) chartType = 'area';
+              
+              const chartPromises = images.images.map((imgUrl: string) => 
+                apiService.createChart({
+                  space_key: selectedSpace,
+                  page_title: page,
+                  image_url: imgUrl,
+                  chart_type: chartType,
+                  filename: `chart_${page.replace(/\s+/g, '_')}`,
+                  format: 'png',
+                })
+              );
+              
+              const chartResults = await Promise.all(chartPromises);
+              if (chartResults.length > 0) {
+                graphOutput = `### Graph Conversion\nConverted ${chartResults.length} image(s) to ${chartType} chart(s).\n\nGenerated charts:\n${chartResults.map((result, index) => `- Chart ${index + 1}: ${result.chart_url || 'Chart generated successfully'}`).join('\n')}`;
+              }
+            }
+          } catch (err) {
+            // ignore, fallback below
+          }
+        }
+        
+        // Combine all outputs
+        const outputs = [aiSearchOutput, videoSummaryOutput, graphOutput].filter(Boolean);
+        if (outputs.length > 0) {
+          pageOutput = outputs.join('\n\n');
         } else {
           pageOutput = `No relevant results found for "${page}" based on your instruction.`;
         }
@@ -719,46 +752,6 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
                 </div>
                 {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
               </div>
-              {/* Live Progress Log - moved to right of selectors, fades when output appears */}
-              {planSteps.length > 0 && (
-                <div className={`bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg transition-opacity duration-500 ${outputTabs.length > 0 ? 'opacity-50' : 'opacity-100'}`}>
-                  <h3 className="font-semibold text-gray-800 mb-4">Live Progress Log</h3>
-                  <div className="space-y-4">
-                    {planSteps.map((step, index) => (
-                      <div key={step.id} className="flex items-start space-x-3">
-                        <div className="flex-shrink-0 mt-1">
-                          {step.status === 'completed' ? (
-                            <CheckCircle className="w-5 h-5 text-green-500" />
-                          ) : step.status === 'running' ? (
-                            <Loader2 className="w-5 h-5 text-orange-500 animate-spin" />
-                          ) : (
-                            <div className="w-5 h-5 border-2 border-gray-300 rounded-full" />
-                          )}
-                        </div>
-                        <div className="flex-1">
-                          <div className="font-medium text-gray-800">{step.title}</div>
-                          {step.details && (
-                            <div className="text-sm text-gray-600 mt-1">{step.details}</div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  {/* Progress Bar */}
-                  <div className="mt-6">
-                    <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
-                      <span>Progress</span>
-                      <span>{progressPercent}%</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="bg-orange-500 h-2 rounded-full transition-all duration-500"
-                        style={{ width: `${progressPercent}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
               {/* Chat Section - always present */}
               <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg mb-4">
                 <h3 className="font-semibold text-gray-800 mb-2 flex items-center"><MessageSquare className="w-5 h-5 mr-2 text-orange-500" /> Chat</h3>
@@ -801,48 +794,76 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
             <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)] flex-1">
               {/* Before results: selectors and goal input as before */}
               {planSteps.length === 0 && !isPlanning && (
-                <div className="max-w-6xl mx-auto mb-6 sticky top-0 z-30">
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Select Space and Pages - Left Column */}
-                    <div className="lg:col-span-2">
-                      <div className="bg-white/60 backdrop-blur-xl rounded-xl p-6 border border-white/20 shadow-lg text-center">
-                        <h3 className="text-xl font-bold text-gray-800 mb-4">Select Space and Pages</h3>
-                        <div className="flex flex-col md:flex-row md:space-x-4 items-center justify-center mb-4">
-                          <div className="mb-4 md:mb-0 w-full md:w-1/2">
-                            <label className="block text-gray-700 mb-2 text-left">Space</label>
-                            <Select
-                              classNamePrefix="react-select"
-                              options={spaces.map(space => ({ value: space.key, label: `${space.name} (${space.key})` }))}
-                              value={spaces.find(s => s.key === selectedSpace) ? { value: selectedSpace, label: `${spaces.find(s => s.key === selectedSpace)?.name} (${selectedSpace})` } : null}
-                              onChange={option => {
-                                setSelectedSpace(option ? option.value : '');
-                                setSelectedPages([]);
-                              }}
-                              placeholder="Select a space..."
-                              isClearable
-                            />
-                          </div>
-                          <div className="w-full md:w-1/2">
-                            <label className="block text-gray-700 mb-2 text-left">Pages</label>
-                            <Select
-                              classNamePrefix="react-select"
-                              isMulti
-                              isSearchable
-                              isDisabled={!selectedSpace}
-                              options={pages.map(page => ({ value: page, label: page }))}
-                              value={selectedPages.map(page => ({ value: page, label: page }))}
-                              onChange={options => setSelectedPages(options ? options.map(opt => opt.value) : [])}
-                              placeholder={selectedSpace ? "Type or select pages..." : "Select a space first"}
-                              closeMenuOnSelect={false}
-                            />
-                            <div className="text-xs text-gray-500 mt-1 text-left">Type to search and select multiple pages.</div>
-                          </div>
-                        </div>
-                        {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
+                <div className="max-w-4xl mx-auto mb-6 sticky top-0 z-30">
+                  <div className="bg-white/60 backdrop-blur-xl rounded-xl p-6 border border-white/20 shadow-lg text-center">
+                    <h3 className="text-xl font-bold text-gray-800 mb-4">Select Space and Pages</h3>
+                    <div className="flex flex-col md:flex-row md:space-x-4 items-center justify-center mb-4">
+                      <div className="mb-4 md:mb-0 w-full md:w-1/2">
+                        <label className="block text-gray-700 mb-2 text-left">Space</label>
+                        <Select
+                          classNamePrefix="react-select"
+                          options={spaces.map(space => ({ value: space.key, label: `${space.name} (${space.key})` }))}
+                          value={spaces.find(s => s.key === selectedSpace) ? { value: selectedSpace, label: `${spaces.find(s => s.key === selectedSpace)?.name} (${selectedSpace})` } : null}
+                          onChange={option => {
+                            setSelectedSpace(option ? option.value : '');
+                            setSelectedPages([]);
+                          }}
+                          placeholder="Select a space..."
+                          isClearable
+                        />
+                      </div>
+                      <div className="w-full md:w-1/2">
+                        <label className="block text-gray-700 mb-2 text-left">Pages</label>
+                        <Select
+                          classNamePrefix="react-select"
+                          isMulti
+                          isSearchable
+                          isDisabled={!selectedSpace}
+                          options={pages.map(page => ({ value: page, label: page }))}
+                          value={selectedPages.map(page => ({ value: page, label: page }))}
+                          onChange={options => setSelectedPages(options ? options.map(opt => opt.value) : [])}
+                          placeholder={selectedSpace ? "Type or select pages..." : "Select a space first"}
+                          closeMenuOnSelect={false}
+                        />
+                        <div className="text-xs text-gray-500 mt-1 text-left">Type to search and select multiple pages.</div>
                       </div>
                     </div>
-                    {/* Live Progress Log - Right Column */}
-                    <div className="lg:col-span-1">
+                    {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
+                  </div>
+                </div>
+              )}
+              {/* Goal Input Section */}
+              {!planSteps.length && !isPlanning && (
+                <div className="max-w-4xl mx-auto">
+                  <div className="bg-white/60 backdrop-blur-xl rounded-xl p-8 border border-white/20 shadow-lg text-center">
+                    <h3 className="text-2xl font-bold text-gray-800 mb-6">What do you want the assistant to help you achieve?</h3>
+                    <div className="relative">
+                      <textarea
+                        value={goal}
+                        onChange={(e) => setGoal(e.target.value)}
+                        placeholder="Describe your goal in detail... (e.g., 'Help me analyze our documentation structure and recommend improvements for better user experience')"
+                        className="w-full p-4 border-2 border-orange-200/50 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 resize-none bg-white/70 backdrop-blur-sm text-lg"
+                        rows={4}
+                      />
+                      <button
+                        onClick={() => handleGoalSubmit()}
+                        disabled={!goal.trim() || !selectedSpace || !selectedPages.length}
+                        className="absolute bottom-4 right-4 bg-orange-500/90 backdrop-blur-sm text-white p-3 rounded-xl hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center space-x-2 transition-colors border border-white/10"
+                      >
+                        <Send className="w-5 h-5" />
+                      </button>
+                    </div>
+                    {error && <p className="text-red-500 text-sm mt-4">{error}</p>}
+                  </div>
+                </div>
+              )}
+              {/* Planning Phase - removed planning box */}
+              {isPlanning && null}
+              {/* Live Progress Log - in place of final answer, disappears when output is shown */}
+              {planSteps.length > 0 && outputTabs.length === 0 && (
+                <div className="w-full">
+                  <div className="bg-white/60 backdrop-blur-xl rounded-xl border border-white/20 shadow-lg overflow-hidden">
+                    <div className="p-6">
                       <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg">
                         <h3 className="font-semibold text-gray-800 mb-4">Live Progress Log</h3>
                         <div className="space-y-4">
@@ -884,97 +905,68 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
                   </div>
                 </div>
               )}
-              {/* Goal Input Section */}
-              {!planSteps.length && !isPlanning && (
-                <div className="max-w-4xl mx-auto">
-                  <div className="bg-white/60 backdrop-blur-xl rounded-xl p-8 border border-white/20 shadow-lg text-center">
-                    <h3 className="text-2xl font-bold text-gray-800 mb-6">What do you want the assistant to help you achieve?</h3>
-                    <div className="relative">
-                      <textarea
-                        value={goal}
-                        onChange={(e) => setGoal(e.target.value)}
-                        placeholder="Describe your goal in detail... (e.g., 'Help me analyze our documentation structure and recommend improvements for better user experience')"
-                        className="w-full p-4 border-2 border-orange-200/50 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 resize-none bg-white/70 backdrop-blur-sm text-lg"
-                        rows={4}
-                      />
-                      <button
-                        onClick={() => handleGoalSubmit()}
-                        disabled={!goal.trim() || !selectedSpace || !selectedPages.length}
-                        className="absolute bottom-4 right-4 bg-orange-500/90 backdrop-blur-sm text-white p-3 rounded-xl hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center space-x-2 transition-colors border border-white/10"
-                      >
-                        <Send className="w-5 h-5" />
-                      </button>
-                    </div>
-                    {error && <p className="text-red-500 text-sm mt-4">{error}</p>}
-                  </div>
-                </div>
-              )}
-              {/* Planning Phase - removed planning box */}
-              {isPlanning && null}
               {/* Results Area */}
-              {planSteps.length > 0 && (
+              {planSteps.length > 0 && outputTabs.length > 0 && (
                 <div className="w-full">
-                  {outputTabs.length > 0 && (
-                    <div className="bg-white/60 backdrop-blur-xl rounded-xl border border-white/20 shadow-lg overflow-hidden">
-                      {/* Tab Headers */}
-                      <div className="border-b border-white/20 bg-white/40 backdrop-blur-sm">
-                        <div className="flex overflow-x-auto">
-                          {outputTabs.map(tab => {
-                            const Icon = tab.icon;
-                            return (
-                              <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id)}
-                                className={`flex items-center space-x-2 px-4 py-3 border-b-2 transition-colors whitespace-nowrap ${
-                                  activeTab === tab.id
-                                    ? 'border-orange-500 text-orange-600 bg-white/50'
-                                    : 'border-transparent text-gray-600 hover:text-gray-800 hover:bg-white/30'
-                                }`}
-                              >
-                                <Icon className="w-4 h-4" />
-                                <span className="text-sm font-medium">{tab.label}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                      {/* Tab Content */}
-                      <div className="p-6">
-                        {outputTabs.find(tab => tab.id === activeTab) && (
-                          <div className="prose prose-sm max-w-none">
-                            {/* Final Answer tab with per-page buttons */}
-                            {activeTab === 'final-answer' && outputTabs.find(tab => tab.id === 'final-answer')?.pageOutputs ? (
-                              <div>
-                                <div className="mb-4 flex flex-wrap gap-2">
-                                  {Object.keys(outputTabs.find(tab => tab.id === 'final-answer').pageOutputs).map(page => (
-                                    <button
-                                      key={page}
-                                      className={`px-3 py-1 rounded-xl text-xs font-semibold border ${selectedFinalPage === page ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-orange-600 border-orange-300 hover:bg-orange-100'} transition-colors`}
-                                      onClick={() => setSelectedFinalPage(page)}
-                                    >
-                                      {page}
-                                    </button>
-                                  ))}
-                                </div>
-                                <div className="whitespace-pre-wrap text-gray-700">
-                                  {(() => {
-                                    const content = outputTabs.find(tab => tab.id === 'final-answer').pageOutputs[selectedFinalPage || Object.keys(outputTabs.find(tab => tab.id === 'final-answer').pageOutputs)[0]] || 'No output for this page.';
-                                    // Format content based on type
-                                    return formatContent(content);
-                                  })()}
-                                </div>
-                              </div>
-                            ) : (
-                              // Other tabs or fallback
-                              <div className="whitespace-pre-wrap text-gray-700">
-                                {formatContent(outputTabs.find(tab => tab.id === activeTab)?.content || '')}
-                              </div>
-                            )}
-                          </div>
-                        )}
+                  <div className="bg-white/60 backdrop-blur-xl rounded-xl border border-white/20 shadow-lg overflow-hidden">
+                    {/* Tab Headers */}
+                    <div className="border-b border-white/20 bg-white/40 backdrop-blur-sm">
+                      <div className="flex overflow-x-auto">
+                        {outputTabs.map(tab => {
+                          const Icon = tab.icon;
+                          return (
+                            <button
+                              key={tab.id}
+                              onClick={() => setActiveTab(tab.id)}
+                              className={`flex items-center space-x-2 px-4 py-3 border-b-2 transition-colors whitespace-nowrap ${
+                                activeTab === tab.id
+                                  ? 'border-orange-500 text-orange-600 bg-white/50'
+                                  : 'border-transparent text-gray-600 hover:text-gray-800 hover:bg-white/30'
+                              }`}
+                            >
+                              <Icon className="w-4 h-4" />
+                              <span className="text-sm font-medium">{tab.label}</span>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
-                  )}
+                    {/* Tab Content */}
+                    <div className="p-6">
+                      {outputTabs.find(tab => tab.id === activeTab) && (
+                        <div className="prose prose-sm max-w-none">
+                          {/* Final Answer tab with per-page buttons */}
+                          {activeTab === 'final-answer' && outputTabs.find(tab => tab.id === 'final-answer')?.pageOutputs ? (
+                            <div>
+                              <div className="mb-4 flex flex-wrap gap-2">
+                                {Object.keys(outputTabs.find(tab => tab.id === 'final-answer').pageOutputs).map(page => (
+                                  <button
+                                    key={page}
+                                    className={`px-3 py-1 rounded-xl text-xs font-semibold border ${selectedFinalPage === page ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-orange-600 border-orange-300 hover:bg-orange-100'} transition-colors`}
+                                    onClick={() => setSelectedFinalPage(page)}
+                                  >
+                                    {page}
+                                  </button>
+                                ))}
+                              </div>
+                              <div className="whitespace-pre-wrap text-gray-700">
+                                {(() => {
+                                  const content = outputTabs.find(tab => tab.id === 'final-answer').pageOutputs[selectedFinalPage || Object.keys(outputTabs.find(tab => tab.id === 'final-answer').pageOutputs)[0]] || 'No output for this page.';
+                                  // Format content based on type
+                                  return formatContent(content);
+                                })()}
+                              </div>
+                            </div>
+                          ) : (
+                            // Other tabs or fallback
+                            <div className="whitespace-pre-wrap text-gray-700">
+                              {formatContent(outputTabs.find(tab => tab.id === activeTab)?.content || '')}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
               {/* Actions */}
