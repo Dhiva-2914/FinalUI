@@ -174,11 +174,10 @@ const CodeAssistant: React.FC<CodeAssistantProps> = ({ onClose, onFeatureSelect,
 
     const actionPromptMap: Record<string, string> = {
       "Summarize Code": `Summarize the following code in clear and concise language:\n\n${detectedCode}`,
-      "Optimize Performance": `Optimize the following code for performance without changing its functionality:\n\n${detectedCode}`,
-      "Convert Language": `Convert the following code to another programming language. Suggest a language too:\n\n${detectedCode}`,
-      "Generate Documentation": `Generate inline documentation and function-level comments for the following code:\n\n${detectedCode}`,
-      "Refactor Structure": `Refactor the following code to improve structure, readability, and modularity:\n\n${detectedCode}`,
-      "Security Analysis": `Analyze the following code for security vulnerabilities and suggest improvements:\n\n${detectedCode}`,
+      "Optimize Performance": `Optimize the following code for performance without changing its functionality, return only the updated code:\n\n${detectedCode}`,
+      "Generate Documentation": `Generate inline documentation and function-level comments for the following code, return only the updated code by commenting the each line of the code.:\n\n${detectedCode}`,
+      "Refactor Structure": `Refactor the following code to improve structure, readability, and modularity, return only the updated code:\n\n${detectedCode}`,
+      "Identify dead code": `Analyze the following code for any unsued code or dead code, return only the updated code by removing the dead code:\n\n${detectedCode}`,
     };
 
     try {
@@ -210,7 +209,7 @@ const CodeAssistant: React.FC<CodeAssistantProps> = ({ onClose, onFeatureSelect,
   };
 
   const exportCode = async (format: string) => {
-    const content = processedCode || detectedCode;
+    const content = processedCode || aiActionOutput || detectedCode;
     if (!content) return;
 
     try {
@@ -350,20 +349,6 @@ const CodeAssistant: React.FC<CodeAssistantProps> = ({ onClose, onFeatureSelect,
                   </div>
                 </div>
 
-                {/* AI Action Output */}
-                {aiActionOutput && (
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      AI Action Output
-                    </label>
-                    <div className="bg-gray-900/90 backdrop-blur-sm rounded-lg p-4 border border-white/10 max-h-32 overflow-auto">
-                      <pre className="text-sm text-gray-300">
-                        <code>{aiActionOutput}</code>
-                      </pre>
-                    </div>
-                  </div>
-                )}
-
                 {/* Instruction Input */}
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -468,7 +453,7 @@ const CodeAssistant: React.FC<CodeAssistantProps> = ({ onClose, onFeatureSelect,
               <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-semibold text-gray-800">AI Result</h3>
-                  {processedCode && (
+                  {(processedCode || aiActionOutput) && (
                     <div className="flex space-x-2">
                       <button
                         onClick={() => exportCode('js')}
@@ -487,7 +472,7 @@ const CodeAssistant: React.FC<CodeAssistantProps> = ({ onClose, onFeatureSelect,
                             await apiService.saveToConfluence({
                               space_key: space,
                               page_title: page,
-                              content: processedCode || '',
+                              content: processedCode || aiActionOutput || '',
                             });
                             setShowToast(true);
                             setTimeout(() => setShowToast(false), 3000);
@@ -504,7 +489,16 @@ const CodeAssistant: React.FC<CodeAssistantProps> = ({ onClose, onFeatureSelect,
                   )}
                 </div>
                 
-                {processedCode ? (
+                {aiActionOutput ? (
+                  <div className="bg-gray-900/90 backdrop-blur-sm rounded-lg p-4 overflow-auto max-h-96 border border-white/10">
+                    <div className="mb-2 text-sm text-gray-400">
+                      <strong>AI Action:</strong> {aiAction}
+                    </div>
+                    <pre className="text-sm text-gray-300">
+                      <code>{aiActionOutput}</code>
+                    </pre>
+                  </div>
+                ) : processedCode ? (
                   <div className="bg-gray-900/90 backdrop-blur-sm rounded-lg p-4 overflow-auto max-h-96 border border-white/10">
                     <pre className="text-sm text-gray-300">
                       <code>{processedCode}</code>
@@ -519,7 +513,7 @@ const CodeAssistant: React.FC<CodeAssistantProps> = ({ onClose, onFeatureSelect,
               </div>
 
               {/* Export Options */}
-              {processedCode && (
+              {processedCode || aiActionOutput ? (
                 <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg">
                   <h4 className="font-semibold text-gray-800 mb-3">Export Options</h4>
                   <div className="space-y-3">
@@ -556,7 +550,7 @@ const CodeAssistant: React.FC<CodeAssistantProps> = ({ onClose, onFeatureSelect,
                             await apiService.saveToConfluence({
                               space_key: space,
                               page_title: page,
-                              content: processedCode || '',
+                              content: processedCode || aiActionOutput || '',
                             });
                             setShowToast(true);
                             setTimeout(() => setShowToast(false), 3000);
@@ -572,7 +566,7 @@ const CodeAssistant: React.FC<CodeAssistantProps> = ({ onClose, onFeatureSelect,
                     </div>
                   </div>
                 </div>
-              )}
+              ) : null}
             </div>
           </div>
         </div>
