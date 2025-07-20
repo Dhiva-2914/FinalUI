@@ -28,6 +28,9 @@ const CodeAssistant: React.FC<CodeAssistantProps> = ({ onClose, onFeatureSelect,
   const [showToast, setShowToast] = useState(false);
   const [aiAction, setAiAction] = useState('');
   const [aiActionOutput, setAiActionOutput] = useState('');
+  // State for displaying all outputs in AI Result
+  const [modificationOutput, setModificationOutput] = useState('');
+  const [conversionOutput, setConversionOutput] = useState('');
 
   const features = [
     { id: 'search' as const, label: 'AI Powered Search', icon: Search },
@@ -150,13 +153,17 @@ const CodeAssistant: React.FC<CodeAssistantProps> = ({ onClose, onFeatureSelect,
           target_language: targetLanguage || undefined
         });
 
-        // Prioritize converted code if target language is selected, otherwise use modified code
-        if (targetLanguage && result.converted_code) {
-          setProcessedCode(result.converted_code);
-        } else if (result.modified_code) {
-          setProcessedCode(result.modified_code);
+        // Show converted code if target language is selected
+        if (hasTargetLanguage && result.converted_code) {
+          setConversionOutput(result.converted_code);
         } else {
-          setProcessedCode(result.original_code || '');
+          setConversionOutput('');
+        }
+        // Show modified code if modification instruction is used
+        if (hasModificationInstruction && result.modified_code) {
+          setModificationOutput(result.modified_code);
+        } else {
+          setModificationOutput('');
         }
       }
     } catch (err) {
@@ -231,6 +238,9 @@ const CodeAssistant: React.FC<CodeAssistantProps> = ({ onClose, onFeatureSelect,
       console.error('Error exporting:', err);
     }
   };
+
+  // Use a default file name if fileName is empty
+  const effectiveFileName = fileName || 'ai-result';
 
   return (
     <div className="fixed inset-0 bg-white flex items-center justify-center z-40 p-4">
@@ -456,7 +466,7 @@ const CodeAssistant: React.FC<CodeAssistantProps> = ({ onClose, onFeatureSelect,
                   <h3 className="font-semibold text-gray-800">AI Result</h3>
                 </div>
                 
-                {aiActionOutput ? (
+                {aiActionOutput && (
                   <div className="bg-gray-900/90 backdrop-blur-sm rounded-lg p-4 overflow-auto max-h-96 border border-white/10">
                     <div className="mb-2 text-sm text-gray-400">
                       <strong>AI Action:</strong> {aiAction}
@@ -465,22 +475,31 @@ const CodeAssistant: React.FC<CodeAssistantProps> = ({ onClose, onFeatureSelect,
                       <code>{aiActionOutput}</code>
                     </pre>
                   </div>
-                ) : processedCode ? (
+                )}
+                {conversionOutput && (
                   <div className="bg-gray-900/90 backdrop-blur-sm rounded-lg p-4 overflow-auto max-h-96 border border-white/10">
+                    <div className="mb-2 text-sm text-gray-400">
+                      <strong>Target Language Conversion:</strong> {targetLanguage}
+                    </div>
                     <pre className="text-sm text-gray-300">
-                      <code>{processedCode}</code>
+                      <code>{conversionOutput}</code>
                     </pre>
                   </div>
-                ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    <Zap className="w-12 h-12 mx-auto mb-2 text-gray-400" />
-                    <p>Process code to see AI results</p>
+                )}
+                {modificationOutput && (
+                  <div className="bg-gray-900/90 backdrop-blur-sm rounded-lg p-4 overflow-auto max-h-96 border border-white/10">
+                    <div className="mb-2 text-sm text-gray-400">
+                      <strong>Modification Instruction:</strong> {instruction}
+                    </div>
+                    <pre className="text-sm text-gray-300">
+                      <code>{modificationOutput}</code>
+                    </pre>
                   </div>
                 )}
               </div>
 
               {/* Export Options */}
-              {processedCode || aiActionOutput ? (
+              {processedCode || aiActionOutput || conversionOutput || modificationOutput ? (
                 <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg">
                   <h4 className="font-semibold text-gray-800 mb-3">Export Options</h4>
                   <div className="space-y-3">
@@ -517,7 +536,7 @@ const CodeAssistant: React.FC<CodeAssistantProps> = ({ onClose, onFeatureSelect,
                             await apiService.saveToConfluence({
                               space_key: space,
                               page_title: page,
-                              content: processedCode || aiActionOutput || '',
+                              content: processedCode || aiActionOutput || conversionOutput || modificationOutput || '',
                             });
                             setShowToast(true);
                             setTimeout(() => setShowToast(false), 3000);
