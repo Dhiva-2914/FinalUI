@@ -51,7 +51,6 @@ const CodeAssistant: React.FC<CodeAssistantProps> = ({ onClose, onFeatureSelect,
     'Optimize Performance', 
     'Generate Documentation',
     'Refactor Structure',
-    'Security Analysis',
     'Identify dead code'
   ];
 
