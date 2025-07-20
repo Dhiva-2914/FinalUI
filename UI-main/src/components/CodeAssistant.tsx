@@ -47,7 +47,6 @@ const CodeAssistant: React.FC<CodeAssistantProps> = ({ onClose, onFeatureSelect,
 
   const aiActions = [
     'Select action...',
-    'Summarize Code',
     'Optimize Performance', 
     'Generate Documentation',
     'Refactor Structure',
@@ -124,6 +123,11 @@ const CodeAssistant: React.FC<CodeAssistantProps> = ({ onClose, onFeatureSelect,
       setError('Please select a space and page.');
       return;
     }
+
+    // Clear previous outputs before running a new process
+    setAiActionOutput('');
+    setConversionOutput('');
+    setModificationOutput('');
 
     // Check if any option is selected
     const hasModificationInstruction = instruction.trim() !== '';
