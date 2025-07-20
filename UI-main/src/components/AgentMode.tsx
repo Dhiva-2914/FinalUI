@@ -806,8 +806,9 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
           {/* Sidebar */}
           {sidebarOpen && (
             <div className="w-full max-w-xs bg-white/90 border-r border-white/20 flex flex-col p-4 space-y-6 relative z-10 h-full">
+              {/* Sidebar toggle icon at the top */}
               <button
-                className="absolute left-0 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-orange-500 bg-white rounded-r-xl px-2 py-1 shadow-lg"
+                className="absolute left-0 top-4 text-gray-400 hover:text-orange-500 bg-white rounded-r-xl px-2 py-1 shadow-lg"
                 onClick={() => setSidebarOpen(false)}
                 title="Close sidebar"
                 style={{ zIndex: 20 }}
@@ -815,7 +816,7 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
                 <PanelLeftClose className="w-6 h-6" />
               </button>
               {/* Space and Page Selectors */}
-              <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg">
+              <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg z-30">
                 <h3 className="text-lg font-bold text-gray-800 mb-4">Select Space and Pages</h3>
                 <div className="mb-4">
                     <label className="block text-gray-700 mb-2 text-left">Space</label>
@@ -829,6 +830,8 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
                       }}
                       placeholder="Select a space..."
                       isClearable
+                      menuPortalTarget={document.body}
+                      styles={{ menuPortal: base => ({ ...base, zIndex: 9999 }) }}
                     />
                   </div>
                 <div>
@@ -843,6 +846,8 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
                       onChange={options => setSelectedPages(options ? options.map(opt => opt.value) : [])}
                       placeholder={selectedSpace ? "Type or select pages..." : "Select a space first"}
                       closeMenuOnSelect={false}
+                      menuPortalTarget={document.body}
+                      styles={{ menuPortal: base => ({ ...base, zIndex: 9999 }) }}
                     />
                     <div className="text-xs text-gray-500 mt-1 text-left">Type to search and select multiple pages.</div>
                 </div>

@@ -9,9 +9,10 @@ interface CodeAssistantProps {
   onFeatureSelect: (feature: FeatureType) => void;
   autoSpaceKey?: string | null;
   isSpaceAutoConnected?: boolean;
+  onModeSelect?: (mode: 'agent' | 'tool') => void;
 }
 
-const CodeAssistant: React.FC<CodeAssistantProps> = ({ onClose, onFeatureSelect, autoSpaceKey, isSpaceAutoConnected }) => {
+const CodeAssistant: React.FC<CodeAssistantProps> = ({ onClose, onFeatureSelect, autoSpaceKey, isSpaceAutoConnected, onModeSelect }) => {
   const [selectedSpace, setSelectedSpace] = useState('');
   const [selectedPage, setSelectedPage] = useState('');
   const [spaces, setSpaces] = useState<Space[]>([]);
@@ -259,6 +260,12 @@ const CodeAssistant: React.FC<CodeAssistantProps> = ({ onClose, onFeatureSelect,
                 <p className="text-blue-100/90">AI-powered tools for your Confluence workspace</p>
               </div>
             </div>
+            <button 
+              onClick={() => onModeSelect && onModeSelect('agent')}
+              className="text-blue-100 hover:text-white hover:bg-white/10 rounded-xl px-3 py-1 text-sm transition-colors"
+            >
+              Switch to Agent Mode
+            </button>
             <button onClick={onClose} className="text-white hover:bg-white/10 rounded-full p-2 backdrop-blur-sm">
               <X className="w-6 h-6" />
             </button>
