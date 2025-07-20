@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Select from 'react-select';
-import { Zap, X, Send, Download, RotateCcw, FileText, Brain, CheckCircle, Loader2, MessageSquare, Plus } from 'lucide-react';
+import { Zap, X, Send, Download, RotateCcw, FileText, Brain, CheckCircle, Loader2, MessageSquare, Plus, LayoutSidebar } from 'lucide-react';
 import type { AppMode } from '../App';
 import { apiService, analyzeGoal } from '../services/api';
 
@@ -258,21 +258,30 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
         let pageOutput = '';
         let aiSearchOutput = '';
         let videoSummaryOutput = '';
+        
+        // Check what the instruction mentions to determine what results to include
+        const instruction = usedGoal.toLowerCase();
+        const shouldIncludeSearch = instruction.includes('search') || instruction.includes('find') || instruction.includes('analyze') || instruction.includes('content') || !instruction.includes('video');
+        const shouldIncludeVideo = instruction.includes('video') || instruction.includes('summarize') || instruction.includes('summary');
+        
         // Try to get page-specific output by calling search for this specific page
-        try {
-          const pageSpecificResult = await apiService.search({
-            space_key: selectedSpace,
-            page_titles: [page],
-            query: usedGoal,
-          });
-          if (pageSpecificResult && pageSpecificResult.response) {
-            aiSearchOutput = `### AI Search Result\n${pageSpecificResult.response}`;
+        if (shouldIncludeSearch) {
+          try {
+            const pageSpecificResult = await apiService.search({
+              space_key: selectedSpace,
+              page_titles: [page],
+              query: usedGoal,
+            });
+            if (pageSpecificResult && pageSpecificResult.response) {
+              aiSearchOutput = `### AI Search Result\n${pageSpecificResult.response}`;
+            }
+          } catch (err) {
+            // ignore, fallback below
           }
-        } catch (err) {
-          // ignore, fallback below
         }
-        // Try to get video summary if tool is available
-        if (toolsToUse.includes('video_summarizer')) {
+        
+        // Try to get video summary if tool is available and instruction mentions it
+        if (toolsToUse.includes('video_summarizer') && shouldIncludeVideo) {
           try {
             const videoResult = await apiService.videoSummarizer({
               space_key: selectedSpace,
@@ -285,6 +294,7 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
             // ignore, fallback below
           }
         }
+        
         if (aiSearchOutput && videoSummaryOutput) {
           pageOutput = aiSearchOutput + '\n\n' + videoSummaryOutput;
         } else if (aiSearchOutput) {
@@ -292,8 +302,9 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
         } else if (videoSummaryOutput) {
           pageOutput = videoSummaryOutput;
         } else {
-          pageOutput = `No AI search or video summary available for "${page}".`;
+          pageOutput = `No relevant results found for "${page}" based on your instruction.`;
         }
+        
         pageOutputs[page] = pageOutput;
       }
       // If no pages were processed, create a general output
@@ -566,6 +577,48 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
           </div>
         </div>
         <div className="flex flex-1 min-h-0">
+          {/* Live Progress Log - moved to left top, disappears when results are shown */}
+          {planSteps.length > 0 && outputTabs.length === 0 && (
+            <div className="w-full max-w-xs bg-white/90 border-r border-white/20 flex flex-col p-4 space-y-6 relative z-10 h-full">
+              <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg">
+                <h3 className="font-semibold text-gray-800 mb-4">Live Progress Log</h3>
+                <div className="space-y-4">
+                  {planSteps.map((step, index) => (
+                    <div key={step.id} className="flex items-start space-x-3">
+                      <div className="flex-shrink-0 mt-1">
+                        {step.status === 'completed' ? (
+                          <CheckCircle className="w-5 h-5 text-green-500" />
+                        ) : step.status === 'running' ? (
+                          <Loader2 className="w-5 h-5 text-orange-500 animate-spin" />
+                        ) : (
+                          <div className="w-5 h-5 border-2 border-gray-300 rounded-full" />
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-medium text-gray-800">{step.title}</div>
+                        {step.details && (
+                          <div className="text-sm text-gray-600 mt-1">{step.details}</div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {/* Progress Bar */}
+                <div className="mt-6">
+                  <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
+                    <span>Progress</span>
+                    <span>{progressPercent}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-orange-500 h-2 rounded-full transition-all duration-500"
+                      style={{ width: `${progressPercent}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
           {/* Sidebar */}
           {sidebarOpen && (
             <div className="w-full max-w-xs bg-white/90 border-r border-white/20 flex flex-col p-4 space-y-6 relative z-10 h-full">
@@ -575,7 +628,7 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
                 title="Close sidebar"
                 style={{ zIndex: 20 }}
               >
-                <X className="w-5 h-5" />
+                <LayoutSidebar className="w-6 h-6" />
               </button>
               {/* Space and Page Selectors */}
               <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg">
@@ -636,44 +689,6 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
                   {outputTabs.find(tab => tab.id === 'qa')?.content || 'Ask a follow-up question to start the chat.'}
                 </div>
               </div>
-              {/* Progress Timeline */}
-              <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg">
-                <h3 className="font-semibold text-gray-800 mb-4">Live Progress Log</h3>
-                <div className="space-y-4">
-                  {planSteps.map((step, index) => (
-                    <div key={step.id} className="flex items-start space-x-3">
-                      <div className="flex-shrink-0 mt-1">
-                        {step.status === 'completed' ? (
-                          <CheckCircle className="w-5 h-5 text-green-500" />
-                        ) : step.status === 'running' ? (
-                          <Loader2 className="w-5 h-5 text-orange-500 animate-spin" />
-                        ) : (
-                          <div className="w-5 h-5 border-2 border-gray-300 rounded-full" />
-                        )}
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-medium text-gray-800">{step.title}</div>
-                        {step.details && (
-                          <div className="text-sm text-gray-600 mt-1">{step.details}</div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                {/* Progress Bar */}
-                <div className="mt-6">
-                  <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
-                    <span>Progress</span>
-                    <span>{progressPercent}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-orange-500 h-2 rounded-full transition-all duration-500"
-                      style={{ width: `${progressPercent}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
             </div>
           )}
           {/* Sidebar closed, show open button if results are present */}
@@ -683,7 +698,7 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
               onClick={() => setSidebarOpen(true)}
               title="Open sidebar"
             >
-              <Plus className="w-5 h-5" />
+              <LayoutSidebar className="w-5 h-5" />
             </button>
           )}
           {/* Main Content */}
@@ -759,12 +774,7 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
               {/* Results Area */}
               {planSteps.length > 0 && (
                 <div className="w-full">
-                  {error ? (
-                    <div className="bg-white/60 backdrop-blur-xl rounded-xl border border-white/20 shadow-lg overflow-hidden p-8 text-center">
-                      <h2 className="text-xl font-bold text-red-600 mb-2">Failed to analyze the goal</h2>
-                      <p className="text-gray-700">{error}</p>
-                    </div>
-                  ) : outputTabs.length > 0 ? (
+                  {outputTabs.length > 0 && (
                     <div className="bg-white/60 backdrop-blur-xl rounded-xl border border-white/20 shadow-lg overflow-hidden">
                       {/* Tab Headers */}
                       <div className="border-b border-white/20 bg-white/40 backdrop-blur-sm">
@@ -795,42 +805,20 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
                             {/* Final Answer tab with per-page buttons */}
                             {activeTab === 'final-answer' && outputTabs.find(tab => tab.id === 'final-answer')?.pageOutputs ? (
                               <div>
-                                {(outputTabs.find(tab => tab.id === 'final-answer')?.pageOutputs &&
-                                  Object.keys(outputTabs.find(tab => tab.id === 'final-answer')?.pageOutputs ?? {}).length > 0) ? (
-                                  <>
-                                    <div className="mb-4 flex flex-wrap gap-2">
-                                      {(Object.keys(outputTabs.find(tab => tab.id === 'final-answer')?.pageOutputs ?? [])).map(page => (
-                                        <button
-                                          key={page}
-                                          className={`px-3 py-1 rounded text-xs font-semibold border ${selectedFinalPage === page ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-orange-600 border-orange-300 hover:bg-orange-100'} transition-colors`}
-                                          onClick={() => setSelectedFinalPage(page)}
-                                        >
-                                          {page}
-                                        </button>
-                                      ))}
-                                    </div>
-                                    <div className="whitespace-pre-wrap text-gray-700">
-                                      {(() => {
-                                        const finalTab = outputTabs.find(tab => tab.id === 'final-answer');
-                                        const pageOutputs = finalTab?.pageOutputs ?? {};
-                                        const pageKey = selectedFinalPage || Object.keys(pageOutputs)[0];
-                                        const output = pageOutputs[pageKey];
-                                        if (output && output.trim()) {
-                                          return output;
-                                        } else if (finalTab?.content && finalTab.content.trim()) {
-                                          return finalTab.content;
-                                        } else {
-                                          return 'No output or summary available for this page.';
-                                        }
-                                      })()}
-                                    </div>
-                                  </>
-                                ) : (
-                                  <div className="whitespace-pre-wrap text-gray-700">
-                                    {/* Fallback to summary if no per-page outputs */}
-                                    {outputTabs.find(tab => tab.id === 'final-answer')?.content || 'No summary available.'}
-                                  </div>
-                                )}
+                                <div className="mb-4 flex flex-wrap gap-2">
+                                  {Object.keys(outputTabs.find(tab => tab.id === 'final-answer').pageOutputs).map(page => (
+                                    <button
+                                      key={page}
+                                      className={`px-3 py-1 rounded text-xs font-semibold border ${selectedFinalPage === page ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-orange-600 border-orange-300 hover:bg-orange-100'} transition-colors`}
+                                      onClick={() => setSelectedFinalPage(page)}
+                                    >
+                                      {page}
+                                    </button>
+                                  ))}
+                                </div>
+                                <div className="whitespace-pre-wrap text-gray-700">
+                                  {outputTabs.find(tab => tab.id === 'final-answer').pageOutputs[selectedFinalPage || Object.keys(outputTabs.find(tab => tab.id === 'final-answer').pageOutputs)[0]] || 'No output for this page.'}
+                                </div>
                               </div>
                             ) : (
                               // Other tabs or fallback
@@ -860,7 +848,7 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
                         )}
                       </div>
                     </div>
-                  ) : null}
+                  )}
                 </div>
               )}
               {/* Actions */}
