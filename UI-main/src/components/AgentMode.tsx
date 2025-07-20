@@ -60,7 +60,7 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
       try {
         const result = await apiService.getSpaces();
         setSpaces(result.spaces);
-      } catch (err) {
+      } catch (err: any) {
         setError('Failed to load spaces.');
       }
     };
@@ -74,7 +74,7 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
         try {
           const result = await apiService.getPages(selectedSpace);
           setPages(result.pages);
-        } catch (err) {
+        } catch (err: any) {
           setError('Failed to load pages.');
         }
       };
@@ -147,7 +147,7 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
         toolResults['AI Powered Search'] = res;
         } catch (err: any) {
           toolResults['AI Powered Search'] = { summary: '⚠️ Failed to run AI Powered Search: ' + (err.message || 'Unknown error') };
-        }
+      }
       }
       if (toolsToUse.includes('impact_analyzer') && selectedPagesFromAI.length >= 2) {
         try {
@@ -160,7 +160,7 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
         toolResults['Impact Analyzer'] = res;
         } catch (err: any) {
           toolResults['Impact Analyzer'] = { summary: '⚠️ Failed to run Impact Analyzer: ' + (err.message || 'Unknown error') };
-        }
+      }
       }
       if (toolsToUse.includes('code_assistant') && selectedPagesFromAI.length > 0) {
         try {
@@ -172,7 +172,7 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
         toolResults['Code Assistant'] = res;
         } catch (err: any) {
           toolResults['Code Assistant'] = { summary: '⚠️ Failed to run Code Assistant: ' + (err.message || 'Unknown error') };
-        }
+      }
       }
       if (toolsToUse.includes('video_summarizer') && selectedPagesFromAI.length > 0) {
         try {
@@ -183,7 +183,7 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
         toolResults['Video Summarizer'] = res;
         } catch (err: any) {
           toolResults['Video Summarizer'] = { summary: '⚠️ Failed to run Video Summarizer: ' + (err.message || 'Unknown error') };
-        }
+      }
       }
       if (toolsToUse.includes('test_support') && selectedPagesFromAI.length > 0) {
         try {
@@ -194,7 +194,7 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
         toolResults['Test Support'] = res;
         } catch (err: any) {
           toolResults['Test Support'] = { summary: '⚠️ Failed to run Test Support: ' + (err.message || 'Unknown error') };
-        }
+      }
       }
       if (toolsToUse.includes('image_insights') && selectedPagesFromAI.length > 0) {
         try {
@@ -206,10 +206,10 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
             image_url: imgUrl,
           })));
           toolResults['Image Insights'] = summaries;
-          }
+        }
         } catch (err: any) {
           toolResults['Image Insights'] = { summary: '⚠️ Failed to run Image Insights: ' + (err.message || 'Unknown error') };
-        }
+      }
       }
       if (toolsToUse.includes('chart_builder') && selectedPagesFromAI.length > 0) {
         try {
@@ -259,124 +259,174 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
         let aiSearchOutput = '';
         let videoSummaryOutput = '';
         let graphOutput = '';
+        let codeAssistantOutput = '';
+        let imageInsightsOutput = '';
+        let impactAnalyzerOutput = '';
+        let testSupportOutput = '';
         let pageErrors: string[] = [];
         
-        // Check what the instruction mentions to determine what results to include
-        const instruction = usedGoal.toLowerCase();
-        const shouldIncludeSearch = instruction.includes('search') || instruction.includes('find') || instruction.includes('analyze') || instruction.includes('content') || !instruction.includes('video');
-        const shouldIncludeVideo = instruction.includes('video') || instruction.includes('summarize') || instruction.includes('summary');
-        const shouldIncludeGraph = instruction.includes('graph') || instruction.includes('chart') || instruction.includes('convert') || instruction.includes('visualize');
+        // Always try to get comprehensive analysis for each page regardless of instruction
+        try {
+          // 1. AI Search for general content analysis
+          const pageSpecificResult = await apiService.search({
+            space_key: selectedSpace,
+            page_titles: [page],
+            query: usedGoal,
+          });
+          if (pageSpecificResult && pageSpecificResult.response) {
+            aiSearchOutput = `### AI Search Analysis\n${pageSpecificResult.response}`;
+          }
+        } catch (err: any) {
+          pageErrors.push(`Search failed: ${err.message || 'Unknown error'}`);
+          console.error(`Search failed for page ${page}:`, err);
+        }
         
-        // Try to get page-specific output by calling search for this specific page
-        if (shouldIncludeSearch) {
-          try {
-            const pageSpecificResult = await apiService.search({
-              space_key: selectedSpace,
-              page_titles: [page],
-              query: usedGoal,
-            });
-            if (pageSpecificResult && pageSpecificResult.response) {
-              aiSearchOutput = `### AI Search Result\n${pageSpecificResult.response}`;
-            }
-          } catch (err) {
-            pageErrors.push(`Search failed: ${err.message || 'Unknown error'}`);
-            console.error(`Search failed for page ${page}:`, err);
+        // 2. Video Analysis - always try to process videos if available
+        try {
+          const videoResult = await apiService.videoSummarizer({
+            space_key: selectedSpace,
+            page_title: page,
+          });
+          if (videoResult && videoResult.summary) {
+            videoSummaryOutput = `### Video Analysis\n${videoResult.summary}`;
+          }
+        } catch (err: any) {
+          // Only log as error if it's not a "no video found" type error
+          if (!err.message?.includes('no video') && !err.message?.includes('not found')) {
+            pageErrors.push(`Video analysis failed: ${err.message || 'Unknown error'}`);
+            console.error(`Video analysis failed for page ${page}:`, err);
           }
         }
         
-        // Try to get video summary if tool is available and instruction mentions it
-        if (toolsToUse.includes('video_summarizer') && shouldIncludeVideo) {
-          try {
-            const videoResult = await apiService.videoSummarizer({
-              space_key: selectedSpace,
-              page_title: page,
-            });
-            if (videoResult && videoResult.summary) {
-              videoSummaryOutput = `### Video Summary\n${videoResult.summary}`;
-            }
-          } catch (err) {
-            pageErrors.push(`Video summary failed: ${err.message || 'Unknown error'}`);
-            console.error(`Video summary failed for page ${page}:`, err);
-          }
-        }
-        
-        // Try to convert images to graphs if instruction mentions it
-        if (shouldIncludeGraph && toolsToUse.includes('chart_builder')) {
-          try {
-            const images = await apiService.getImages(selectedSpace, page);
-            if (images && images.images && images.images.length > 0) {
-              // Determine chart type from instruction
-              let chartType = 'bar';
-              if (instruction.includes('pie')) chartType = 'pie';
-              else if (instruction.includes('line')) chartType = 'line';
-              else if (instruction.includes('scatter')) chartType = 'scatter';
-              else if (instruction.includes('area')) chartType = 'area';
-              
-              // Process each image to create chart
-              const chartPromises = images.images.map(async (imgUrl: string, index: number) => {
+        // 3. Image Analysis and Graph Creation - always try to process images
+        try {
+          const images = await apiService.getImages(selectedSpace, page);
+          if (images && images.images && images.images.length > 0) {
+            // Process each image for insights
+            const imagePromises = images.images.map(async (imgUrl: string, index: number) => {
+              try {
+                // Get image insights
+                const imageInsight = await apiService.imageSummary({
+                  space_key: selectedSpace,
+                  page_title: page,
+                  image_url: imgUrl,
+                });
+                
+                // Try to create charts for each image
+                let chartResult = null;
                 try {
-                  const chartResult = await apiService.createChart({
+                  chartResult = await apiService.createChart({
                     space_key: selectedSpace,
                     page_title: page,
                     image_url: imgUrl,
-                    chart_type: chartType,
+                    chart_type: 'bar', // Default chart type
                     filename: `chart_${page.replace(/\s+/g, '_')}_${index + 1}`,
                     format: 'png',
                   });
-                  
-                  // Also get image insights for context
-                  const imageInsight = await apiService.imageSummary({
-                    space_key: selectedSpace,
-                    page_title: page,
-                    image_url: imgUrl,
-                  });
-                  
-                  return {
-                    chart: chartResult,
-                    insight: imageInsight,
-                    imageUrl: imgUrl,
-                    chartType: chartType,
-                    index: index + 1
-                  };
-                } catch (err) {
-                  console.error(`Failed to process image ${index + 1} for page ${page}:`, err);
-                  return null;
+                } catch (chartErr) {
+                  console.log(`Chart creation failed for image ${index + 1}:`, chartErr);
                 }
-              });
-              
-              const chartResults = await Promise.all(chartPromises);
-              const successfulResults = chartResults.filter(result => result !== null);
-              
-              if (successfulResults.length > 0) {
-                graphOutput = `### Graph Creation Results\n\n**Page:** ${page}\n**Chart Type:** ${chartType}\n**Images Processed:** ${successfulResults.length}/${images.images.length}\n\n`;
                 
-                successfulResults.forEach((result, index) => {
-                  graphOutput += `#### Chart ${result.index}\n`;
-                  graphOutput += `**Image Analysis:** ${result.insight?.summary || 'Analysis not available'}\n\n`;
-                  graphOutput += `**Generated Chart:** ${result.chart?.chart_url || 'Chart URL not available'}\n\n`;
-                  if (result.chart?.chart_data) {
-                    graphOutput += `**Chart Data:**\n\`\`\`json\n${JSON.stringify(result.chart.chart_data, null, 2)}\n\`\`\`\n\n`;
-                  }
-                  graphOutput += `---\n\n`;
-                });
-              } else {
-                graphOutput = `### Graph Creation\n\n**Page:** ${page}\n**Status:** Failed to process any images\n**Error:** All image processing attempts failed\n\n`;
+                return {
+                  insight: imageInsight,
+                  chart: chartResult,
+                  imageUrl: imgUrl,
+                  index: index + 1
+                };
+              } catch (err: any) {
+                console.error(`Failed to process image ${index + 1} for page ${page}:`, err);
+                return null;
               }
-            } else {
-              graphOutput = `### Graph Creation\n\n**Page:** ${page}\n**Status:** No images found on this page\n\n`;
+            });
+            
+            const imageResults = await Promise.all(imagePromises);
+            const successfulResults = imageResults.filter(result => result !== null);
+            
+            if (successfulResults.length > 0) {
+              imageInsightsOutput = `### Image Analysis\n\n**Page:** ${page}\n**Images Found:** ${successfulResults.length}/${images.images.length}\n\n`;
+              
+              successfulResults.forEach((result) => {
+                imageInsightsOutput += `#### Image ${result.index}\n`;
+                imageInsightsOutput += `**Analysis:** ${result.insight?.summary || 'Analysis not available'}\n\n`;
+                
+                if (result.chart) {
+                  imageInsightsOutput += `**Generated Chart:** Chart data available\n\n`;
+                  if (result.chart.chart_data) {
+                    imageInsightsOutput += `**Chart Data:**\n\`\`\`json\n${JSON.stringify(result.chart.chart_data, null, 2)}\n\`\`\`\n\n`;
+                  }
+                }
+                imageInsightsOutput += `---\n\n`;
+              });
             }
-          } catch (err) {
-            pageErrors.push(`Graph creation failed: ${err.message || 'Unknown error'}`);
-            console.error(`Failed to process images for page ${page}:`, err);
+          }
+        } catch (err: any) {
+          pageErrors.push(`Image analysis failed: ${err.message || 'Unknown error'}`);
+          console.error(`Failed to process images for page ${page}:`, err);
+        }
+        
+        // 4. Code Analysis - always try to analyze code content
+        try {
+          const codeResult = await apiService.codeAssistant({
+            space_key: selectedSpace,
+            page_title: page,
+            instruction: usedGoal,
+          });
+          if (codeResult && codeResult.summary) {
+            codeAssistantOutput = `### Code Analysis\n${codeResult.summary}`;
+          }
+        } catch (err: any) {
+          // Only log as error if it's not a "no code found" type error
+          if (!err.message?.includes('no code') && !err.message?.includes('not found')) {
+            pageErrors.push(`Code analysis failed: ${err.message || 'Unknown error'}`);
+            console.error(`Code analysis failed for page ${page}:`, err);
           }
         }
         
+        // 5. Impact Analysis - always try to analyze impact
+        try {
+          const impactResult = await apiService.impactAnalyzer({
+            space_key: selectedSpace,
+            old_page_title: page,
+            new_page_title: page,
+            question: usedGoal,
+          });
+          if (impactResult && impactResult.impact_analysis) {
+            impactAnalyzerOutput = `### Impact Analysis\n${impactResult.impact_analysis}`;
+          }
+        } catch (err: any) {
+          pageErrors.push(`Impact analysis failed: ${err.message || 'Unknown error'}`);
+          console.error(`Impact analysis failed for page ${page}:`, err);
+        }
+        
+        // 6. Test Support Analysis - always try to analyze test-related content
+        try {
+          const testResult = await apiService.testSupport({
+            space_key: selectedSpace,
+            code_page_title: page,
+            question: usedGoal,
+          });
+          if (testResult && testResult.test_strategy) {
+            testSupportOutput = `### Test Support Analysis\n${testResult.test_strategy}`;
+          }
+        } catch (err: any) {
+          pageErrors.push(`Test support analysis failed: ${err.message || 'Unknown error'}`);
+          console.error(`Test support analysis failed for page ${page}:`, err);
+        }
+        
         // Combine all outputs
-        const outputs = [aiSearchOutput, videoSummaryOutput, graphOutput].filter(Boolean);
+        const outputs = [
+          aiSearchOutput, 
+          videoSummaryOutput, 
+          imageInsightsOutput, 
+          codeAssistantOutput, 
+          impactAnalyzerOutput, 
+          testSupportOutput
+        ].filter(Boolean);
+        
         if (outputs.length > 0) {
           pageOutput = outputs.join('\n\n');
         } else {
-          pageOutput = `### Analysis for "${page}"\n\n**Status:** No relevant results found based on your instruction.\n\n`;
+          pageOutput = `### Analysis for "${page}"\n\n**Status:** No content found or all analysis attempts failed.\n\n`;
         }
         
         // Add error summary if there were any errors
@@ -768,33 +818,33 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
               <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg">
                 <h3 className="text-lg font-bold text-gray-800 mb-4">Select Space and Pages</h3>
                 <div className="mb-4">
-                  <label className="block text-gray-700 mb-2 text-left">Space</label>
-                  <Select
-                    classNamePrefix="react-select"
-                    options={spaces.map(space => ({ value: space.key, label: `${space.name} (${space.key})` }))}
-                    value={spaces.find(s => s.key === selectedSpace) ? { value: selectedSpace, label: `${spaces.find(s => s.key === selectedSpace)?.name} (${selectedSpace})` } : null}
-                    onChange={option => {
-                      setSelectedSpace(option ? option.value : '');
-                      setSelectedPages([]);
-                    }}
-                    placeholder="Select a space..."
-                    isClearable
-                  />
-                </div>
+                    <label className="block text-gray-700 mb-2 text-left">Space</label>
+                    <Select
+                      classNamePrefix="react-select"
+                      options={spaces.map(space => ({ value: space.key, label: `${space.name} (${space.key})` }))}
+                      value={spaces.find(s => s.key === selectedSpace) ? { value: selectedSpace, label: `${spaces.find(s => s.key === selectedSpace)?.name} (${selectedSpace})` } : null}
+                      onChange={option => {
+                        setSelectedSpace(option ? option.value : '');
+                        setSelectedPages([]);
+                      }}
+                      placeholder="Select a space..."
+                      isClearable
+                    />
+                  </div>
                 <div>
-                  <label className="block text-gray-700 mb-2 text-left">Pages</label>
-                  <Select
-                    classNamePrefix="react-select"
-                    isMulti
-                    isSearchable
-                    isDisabled={!selectedSpace}
-                    options={pages.map(page => ({ value: page, label: page }))}
-                    value={selectedPages.map(page => ({ value: page, label: page }))}
-                    onChange={options => setSelectedPages(options ? options.map(opt => opt.value) : [])}
-                    placeholder={selectedSpace ? "Type or select pages..." : "Select a space first"}
-                    closeMenuOnSelect={false}
-                  />
-                  <div className="text-xs text-gray-500 mt-1 text-left">Type to search and select multiple pages.</div>
+                    <label className="block text-gray-700 mb-2 text-left">Pages</label>
+                    <Select
+                      classNamePrefix="react-select"
+                      isMulti
+                      isSearchable
+                      isDisabled={!selectedSpace}
+                      options={pages.map(page => ({ value: page, label: page }))}
+                      value={selectedPages.map(page => ({ value: page, label: page }))}
+                      onChange={options => setSelectedPages(options ? options.map(opt => opt.value) : [])}
+                      placeholder={selectedSpace ? "Type or select pages..." : "Select a space first"}
+                      closeMenuOnSelect={false}
+                    />
+                    <div className="text-xs text-gray-500 mt-1 text-left">Type to search and select multiple pages.</div>
                 </div>
                 {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
               </div>
@@ -845,38 +895,38 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
                     <h3 className="text-xl font-bold text-gray-800 mb-4">Select Space and Pages</h3>
                     <div className="flex flex-col md:flex-row md:space-x-4 items-center justify-center mb-4">
                       <div className="mb-4 md:mb-0 w-full md:w-1/2">
-                        <label className="block text-gray-700 mb-2 text-left">Space</label>
-                        <Select
-                          classNamePrefix="react-select"
-                          options={spaces.map(space => ({ value: space.key, label: `${space.name} (${space.key})` }))}
-                          value={spaces.find(s => s.key === selectedSpace) ? { value: selectedSpace, label: `${spaces.find(s => s.key === selectedSpace)?.name} (${selectedSpace})` } : null}
-                          onChange={option => {
-                            setSelectedSpace(option ? option.value : '');
-                            setSelectedPages([]);
-                          }}
-                          placeholder="Select a space..."
-                          isClearable
-                        />
-                      </div>
-                      <div className="w-full md:w-1/2">
-                        <label className="block text-gray-700 mb-2 text-left">Pages</label>
-                        <Select
-                          classNamePrefix="react-select"
-                          isMulti
-                          isSearchable
-                          isDisabled={!selectedSpace}
-                          options={pages.map(page => ({ value: page, label: page }))}
-                          value={selectedPages.map(page => ({ value: page, label: page }))}
-                          onChange={options => setSelectedPages(options ? options.map(opt => opt.value) : [])}
-                          placeholder={selectedSpace ? "Type or select pages..." : "Select a space first"}
-                          closeMenuOnSelect={false}
-                        />
-                        <div className="text-xs text-gray-500 mt-1 text-left">Type to search and select multiple pages.</div>
-                      </div>
-                    </div>
-                    {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
+                    <label className="block text-gray-700 mb-2 text-left">Space</label>
+                    <Select
+                      classNamePrefix="react-select"
+                      options={spaces.map(space => ({ value: space.key, label: `${space.name} (${space.key})` }))}
+                      value={spaces.find(s => s.key === selectedSpace) ? { value: selectedSpace, label: `${spaces.find(s => s.key === selectedSpace)?.name} (${selectedSpace})` } : null}
+                      onChange={option => {
+                        setSelectedSpace(option ? option.value : '');
+                        setSelectedPages([]);
+                      }}
+                      placeholder="Select a space..."
+                      isClearable
+                    />
                   </div>
+                      <div className="w-full md:w-1/2">
+                    <label className="block text-gray-700 mb-2 text-left">Pages</label>
+                    <Select
+                      classNamePrefix="react-select"
+                      isMulti
+                      isSearchable
+                      isDisabled={!selectedSpace}
+                      options={pages.map(page => ({ value: page, label: page }))}
+                      value={selectedPages.map(page => ({ value: page, label: page }))}
+                      onChange={options => setSelectedPages(options ? options.map(opt => opt.value) : [])}
+                      placeholder={selectedSpace ? "Type or select pages..." : "Select a space first"}
+                      closeMenuOnSelect={false}
+                    />
+                    <div className="text-xs text-gray-500 mt-1 text-left">Type to search and select multiple pages.</div>
+                      </div>
+                  </div>
+                  {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
                 </div>
+                  </div>
               )}
               {/* Goal Input Section */}
               {!planSteps.length && !isPlanning && (
@@ -890,17 +940,17 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
                         placeholder="Describe your goal in detail... (e.g., 'Help me analyze our documentation structure and recommend improvements for better user experience')"
                         className="w-full p-4 border-2 border-orange-200/50 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 resize-none bg-white/70 backdrop-blur-sm text-lg"
                         rows={4}
-                      />
-                      <button
+                        />
+                        <button
                         onClick={() => handleGoalSubmit()}
                         disabled={!goal.trim() || !selectedSpace || !selectedPages.length}
                         className="absolute bottom-4 right-4 bg-orange-500/90 backdrop-blur-sm text-white p-3 rounded-xl hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center space-x-2 transition-colors border border-white/10"
-                      >
+                        >
                         <Send className="w-5 h-5" />
-                      </button>
-                    </div>
+                        </button>
+                      </div>
                     {error && <p className="text-red-500 text-sm mt-4">{error}</p>}
-                  </div>
+                    </div>
                 </div>
               )}
               {/* Planning Phase - removed planning box */}
@@ -910,44 +960,44 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
                 <div className="w-full">
                   <div className="bg-white/60 backdrop-blur-xl rounded-xl border border-white/20 shadow-lg overflow-hidden">
                     <div className="p-6">
-                      <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg">
-                        <h3 className="font-semibold text-gray-800 mb-4">Live Progress Log</h3>
-                        <div className="space-y-4">
-                          {planSteps.map((step, index) => (
-                            <div key={step.id} className="flex items-start space-x-3">
-                              <div className="flex-shrink-0 mt-1">
-                                {step.status === 'completed' ? (
-                                  <CheckCircle className="w-5 h-5 text-green-500" />
-                                ) : step.status === 'running' ? (
-                                  <Loader2 className="w-5 h-5 text-orange-500 animate-spin" />
-                                ) : (
-                                  <div className="w-5 h-5 border-2 border-gray-300 rounded-full" />
-                                )}
-                              </div>
-                              <div className="flex-1">
-                                <div className="font-medium text-gray-800">{step.title}</div>
-                                {step.details && (
-                                  <div className="text-sm text-gray-600 mt-1">{step.details}</div>
-                                )}
-                              </div>
-                            </div>
-                          ))}
+                <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg">
+                  <h3 className="font-semibold text-gray-800 mb-4">Live Progress Log</h3>
+                  <div className="space-y-4">
+                    {planSteps.map((step, index) => (
+                      <div key={step.id} className="flex items-start space-x-3">
+                        <div className="flex-shrink-0 mt-1">
+                          {step.status === 'completed' ? (
+                            <CheckCircle className="w-5 h-5 text-green-500" />
+                          ) : step.status === 'running' ? (
+                            <Loader2 className="w-5 h-5 text-orange-500 animate-spin" />
+                          ) : (
+                            <div className="w-5 h-5 border-2 border-gray-300 rounded-full" />
+                          )}
                         </div>
-                        {/* Progress Bar */}
-                        <div className="mt-6">
-                          <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
-                            <span>Progress</span>
-                            <span>{progressPercent}%</span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="bg-orange-500 h-2 rounded-full transition-all duration-500"
-                              style={{ width: `${progressPercent}%` }}
-                            />
-                          </div>
+                        <div className="flex-1">
+                          <div className="font-medium text-gray-800">{step.title}</div>
+                          {step.details && (
+                            <div className="text-sm text-gray-600 mt-1">{step.details}</div>
+                          )}
                         </div>
                       </div>
+                    ))}
+                  </div>
+                  {/* Progress Bar */}
+                  <div className="mt-6">
+                    <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
+                      <span>Progress</span>
+                      <span>{progressPercent}%</span>
                     </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-orange-500 h-2 rounded-full transition-all duration-500"
+                        style={{ width: `${progressPercent}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
                   </div>
                 </div>
               )}
@@ -985,23 +1035,24 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
                           {activeTab === 'final-answer' && outputTabs.find(tab => tab.id === 'final-answer')?.pageOutputs ? (
                             <div>
                               <div className="mb-4 flex flex-wrap gap-2">
-                                {Object.keys(outputTabs.find(tab => tab.id === 'final-answer').pageOutputs).map(page => (
-                                  <button
+                                {Object.keys(outputTabs.find(tab => tab.id === 'final-answer')?.pageOutputs || {}).map(page => (
+                                    <button
                                     key={page}
                                     className={`px-3 py-1 rounded-xl text-xs font-semibold border ${selectedFinalPage === page ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-orange-600 border-orange-300 hover:bg-orange-100'} transition-colors`}
                                     onClick={() => setSelectedFinalPage(page)}
                                   >
                                     {page}
-                                  </button>
+                                    </button>
                                 ))}
-                              </div>
+                                  </div>
                               <div className="whitespace-pre-wrap text-gray-700">
                                 {(() => {
-                                  const content = outputTabs.find(tab => tab.id === 'final-answer').pageOutputs[selectedFinalPage || Object.keys(outputTabs.find(tab => tab.id === 'final-answer').pageOutputs)[0]] || 'No output for this page.';
+                                  const pageOutputs = outputTabs.find(tab => tab.id === 'final-answer')?.pageOutputs || {};
+                                  const content = pageOutputs[selectedFinalPage || Object.keys(pageOutputs)[0]] || 'No output for this page.';
                                   // Format content based on type
                                   return formatContent(content);
                                 })()}
-                              </div>
+                                </div>
                             </div>
                           ) : (
                             // Other tabs or fallback
@@ -1012,28 +1063,28 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
                         </div>
                       )}
                     </div>
-                  </div>
-                </div>
-              )}
-              {/* Actions */}
-              {planSteps.length > 0 && !isPlanning && !isExecuting && (
-                <div className="flex justify-end mt-8 space-x-4">
-                  <button
-                    onClick={exportPlan}
+              </div>
+            </div>
+          )}
+          {/* Actions */}
+          {planSteps.length > 0 && !isPlanning && !isExecuting && (
+            <div className="flex justify-end mt-8 space-x-4">
+              <button
+                onClick={exportPlan}
                     className="px-6 py-3 bg-orange-500/90 text-white rounded-xl hover:bg-orange-600 transition-colors font-semibold shadow-md border border-white/10"
-                  >
-                    <Download className="w-5 h-5 inline-block mr-2" />
-                    Export Plan
-                  </button>
-                  <button
-                    onClick={replaySteps}
+              >
+                <Download className="w-5 h-5 inline-block mr-2" />
+                Export Plan
+              </button>
+              <button
+                onClick={replaySteps}
                     className="px-6 py-3 bg-white/80 text-orange-600 rounded-xl hover:bg-orange-100 transition-colors font-semibold shadow-md border border-orange-200/50"
-                  >
-                    <RotateCcw className="w-5 h-5 inline-block mr-2" />
-                    Replay Steps
-                  </button>
-                </div>
-              )}
+              >
+                <RotateCcw className="w-5 h-5 inline-block mr-2" />
+                Replay Steps
+              </button>
+            </div>
+          )}
             </div>
           </div>
         </div>
