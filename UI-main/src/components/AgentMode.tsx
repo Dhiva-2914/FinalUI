@@ -490,7 +490,7 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
             page_title: page,
           });
           // Instead of assigning JSX directly to pageOutput, build a markdown or HTML string for video/chart outputs.
-          // For video summary:
+          // For video summarization:
           if (videoResult && (isSummarize(usedGoal) || videoResult.summary)) {
             let videoOutput = '#### Key Quotes\n';
             if (videoResult.quotes && videoResult.quotes.length > 0) {
