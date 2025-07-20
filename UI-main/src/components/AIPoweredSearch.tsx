@@ -9,13 +9,15 @@ interface AIPoweredSearchProps {
   onFeatureSelect: (feature: FeatureType) => void;
   autoSpaceKey?: string | null;
   isSpaceAutoConnected?: boolean;
+  onModeSelect?: (mode: 'agent' | 'tool') => void;
 }
 
 const AIPoweredSearch: React.FC<AIPoweredSearchProps> = ({ 
   onClose, 
   onFeatureSelect, 
   autoSpaceKey, 
-  isSpaceAutoConnected 
+  isSpaceAutoConnected,
+  onModeSelect
 }) => {
   const [selectedSpace, setSelectedSpace] = useState('');
   const [selectedPages, setSelectedPages] = useState<string[]>([]);
@@ -150,13 +152,21 @@ const AIPoweredSearch: React.FC<AIPoweredSearchProps> = ({
             <div className="flex items-center space-x-3">
               <Search className="w-8 h-8" />
               <div>
-                <h2 className="text-2xl font-bold">Confluence AI Assistant</h2>
-                <p className="text-blue-100/90">AI-powered tools for your Confluence workspace</p>
+                <h2 className="text-2xl font-bold">AI Powered Search</h2>
+                <p className="text-blue-100/90">Search and summarize Confluence content with AI</p>
               </div>
             </div>
-            <button onClick={onClose} className="text-white hover:bg-white/10 rounded-full p-2 backdrop-blur-sm">
-              <X className="w-6 h-6" />
-            </button>
+            <div className="flex items-center space-x-2">
+              <button 
+                onClick={() => onModeSelect && onModeSelect('agent')}
+                className="text-blue-100 hover:text-white hover:bg-white/10 rounded-xl px-3 py-1 text-sm transition-colors"
+              >
+                Switch to Agent Mode
+              </button>
+              <button onClick={onClose} className="text-white hover:bg-white/10 rounded-full p-2 backdrop-blur-sm">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
           </div>
           
           {/* Feature Navigation */}
