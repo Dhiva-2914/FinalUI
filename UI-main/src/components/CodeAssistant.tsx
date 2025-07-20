@@ -46,10 +46,10 @@ const CodeAssistant: React.FC<CodeAssistantProps> = ({ onClose, onFeatureSelect,
     'Select action...',
     'Summarize Code',
     'Optimize Performance', 
-    'Convert Language',
     'Generate Documentation',
     'Refactor Structure',
-    'Security Analysis'
+    'Security Analysis',
+    'Identify dead code'
   ];
 
   // Load spaces on component mount
@@ -177,6 +177,7 @@ const CodeAssistant: React.FC<CodeAssistantProps> = ({ onClose, onFeatureSelect,
       "Optimize Performance": `Optimize the following code for performance without changing its functionality, return only the updated code:\n\n${detectedCode}`,
       "Generate Documentation": `Generate inline documentation and function-level comments for the following code, return only the updated code by commenting the each line of the code.:\n\n${detectedCode}`,
       "Refactor Structure": `Refactor the following code to improve structure, readability, and modularity, return only the updated code:\n\n${detectedCode}`,
+      "Security Analysis": `Analyze the following code for security vulnerabilities and suggest improvements, return only the updated code:\n\n${detectedCode}`,
       "Identify dead code": `Analyze the following code for any unsued code or dead code, return only the updated code by removing the dead code:\n\n${detectedCode}`,
     };
 
@@ -191,7 +192,7 @@ const CodeAssistant: React.FC<CodeAssistantProps> = ({ onClose, onFeatureSelect,
         instruction: prompt
       });
 
-      setAiActionOutput(result.summary || result.modified_code || 'AI action completed successfully.');
+      setAiActionOutput(result.modified_code || result.converted_code || result.original_code || 'AI action completed successfully.');
     } catch (err) {
       setError(`Failed to run AI action: ${err}`);
       console.error('Error running AI action:', err);
@@ -453,40 +454,6 @@ const CodeAssistant: React.FC<CodeAssistantProps> = ({ onClose, onFeatureSelect,
               <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-semibold text-gray-800">AI Result</h3>
-                  {(processedCode || aiActionOutput) && (
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => exportCode('js')}
-                        className="px-3 py-1 bg-confluence-blue/90 backdrop-blur-sm text-white rounded text-sm hover:bg-confluence-blue transition-colors border border-white/10"
-                      >
-                        Export
-                      </button>
-                      <button
-                        onClick={async () => {
-                          const { space, page } = getConfluenceSpaceAndPageFromUrl();
-                          if (!space || !page) {
-                            alert('Confluence space or page not specified in macro src URL.');
-                            return;
-                          }
-                          try {
-                            await apiService.saveToConfluence({
-                              space_key: space,
-                              page_title: page,
-                              content: processedCode || aiActionOutput || '',
-                            });
-                            setShowToast(true);
-                            setTimeout(() => setShowToast(false), 3000);
-                          } catch (err: any) {
-                            alert('Failed to save to Confluence: ' + (err.message || err));
-                          }
-                        }}
-                        className="flex items-center space-x-2 px-4 py-2 bg-confluence-blue/90 backdrop-blur-sm text-white rounded-lg hover:bg-confluence-blue transition-colors border border-white/10"
-                      >
-                        <Save className="w-4 h-4" />
-                        <span>Save to Confluence</span>
-                      </button>
-                    </div>
-                  )}
                 </div>
                 
                 {aiActionOutput ? (
