@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Code, FileText, Download, Save, X, ChevronDown, Loader2, Zap, Search, Video, TrendingUp, TestTube, Image, Send } from 'lucide-react';
+import { Code, FileText, Download, Save, X, ChevronDown, Loader2, Zap, Search, Video, TrendingUp, TestTube, Image } from 'lucide-react';
 import { FeatureType } from '../App';
 import { apiService, Space } from '../services/api';
 import { getConfluenceSpaceAndPageFromUrl } from '../utils/urlUtils';
@@ -19,9 +19,6 @@ const CodeAssistant: React.FC<CodeAssistantProps> = ({ onClose, onFeatureSelect,
   const [detectedCode, setDetectedCode] = useState('');
   const [instruction, setInstruction] = useState('');
   const [targetLanguage, setTargetLanguage] = useState('');
-  const [aiAction, setAiAction] = useState('Select action...');
-  const [aiActionOutput, setAiActionOutput] = useState('');
-  const [isProcessingAiAction, setIsProcessingAiAction] = useState(false);
   const [fileName, setFileName] = useState('');
   const [processedCode, setProcessedCode] = useState('');
   const [summary, setSummary] = useState('');
@@ -29,6 +26,8 @@ const CodeAssistant: React.FC<CodeAssistantProps> = ({ onClose, onFeatureSelect,
   const [exportFormat, setExportFormat] = useState('markdown');
   const [error, setError] = useState('');
   const [showToast, setShowToast] = useState(false);
+  const [aiAction, setAiAction] = useState('');
+  const [aiActionOutput, setAiActionOutput] = useState('');
 
   const features = [
     { id: 'search' as const, label: 'AI Powered Search', icon: Search },
@@ -40,133 +39,18 @@ const CodeAssistant: React.FC<CodeAssistantProps> = ({ onClose, onFeatureSelect,
   ];
 
   const outputFormats = [
-    'javascript', 'typescript', 'python', 'java', 'csharp', 'go', 'rust', 'php'
+    'javascript', 'typescript', 'python', 'java', 'csharp', 'go', 'rust', 'php', 'yang', 'cpp', 'c', 'swift', 'kotlin', 'scala', 'ruby', 'perl', 'bash', 'powershell', 'sql', 'html', 'css', 'xml', 'json', 'yaml', 'toml'
   ];
 
-  // Enhanced target language options
-  const targetLanguageOptions = [
-    { value: 'python', label: 'Python' },
-    { value: 'javascript', label: 'JavaScript' },
-    { value: 'typescript', label: 'TypeScript' },
-    { value: 'java', label: 'Java' },
-    { value: 'csharp', label: 'C#' },
-    { value: 'cpp', label: 'C++' },
-    { value: 'c', label: 'C' },
-    { value: 'go', label: 'Go' },
-    { value: 'rust', label: 'Rust' },
-    { value: 'php', label: 'PHP' },
-    { value: 'ruby', label: 'Ruby' },
-    { value: 'swift', label: 'Swift' },
-    { value: 'kotlin', label: 'Kotlin' },
-    { value: 'scala', label: 'Scala' },
-    { value: 'dart', label: 'Dart' },
-    { value: 'r', label: 'R' },
-    { value: 'matlab', label: 'MATLAB' },
-    { value: 'perl', label: 'Perl' },
-    { value: 'bash', label: 'Bash' },
-    { value: 'powershell', label: 'PowerShell' },
-    { value: 'sql', label: 'SQL' },
-    { value: 'html', label: 'HTML' },
-    { value: 'css', label: 'CSS' },
-    { value: 'xml', label: 'XML' },
-    { value: 'json', label: 'JSON' },
-    { value: 'yaml', label: 'YAML' },
-    { value: 'yang', label: 'YANG' },
-    { value: 'assembly', label: 'Assembly' },
-    { value: 'fortran', label: 'Fortran' },
-    { value: 'cobol', label: 'COBOL' },
-    { value: 'pascal', label: 'Pascal' },
-    { value: 'lisp', label: 'Lisp' },
-    { value: 'prolog', label: 'Prolog' },
-    { value: 'haskell', label: 'Haskell' },
-    { value: 'erlang', label: 'Erlang' },
-    { value: 'elixir', label: 'Elixir' },
-    { value: 'clojure', label: 'Clojure' },
-    { value: 'fsharp', label: 'F#' },
-    { value: 'ocaml', label: 'OCaml' },
-    { value: 'nim', label: 'Nim' },
-    { value: 'crystal', label: 'Crystal' },
-    { value: 'zig', label: 'Zig' },
-    { value: 'v', label: 'V' },
-    { value: 'julia', label: 'Julia' },
-    { value: 'nim', label: 'Nim' },
-    { value: 'odin', label: 'Odin' },
-    { value: 'carbon', label: 'Carbon' },
-    { value: 'mojo', label: 'Mojo' },
+  const aiActions = [
+    'Select action...',
+    'Summarize Code',
+    'Optimize Performance', 
+    'Convert Language',
+    'Generate Documentation',
+    'Refactor Structure',
+    'Security Analysis'
   ];
-
-  // AI Actions options
-  const aiActionOptions = [
-    { value: 'Select action...', label: 'Select action...' },
-    { value: 'Summarize Code', label: 'Summarize Code' },
-    { value: 'Optimize Performance', label: 'Optimize Performance' },
-    { value: 'Convert Language', label: 'Convert Language' },
-    { value: 'Generate Documentation', label: 'Generate Documentation' },
-    { value: 'Refactor Structure', label: 'Refactor Structure' },
-    { value: 'Security Analysis', label: 'Security Analysis' },
-    { value: 'Code Review', label: 'Code Review' },
-    { value: 'Debug Assistance', label: 'Debug Assistance' },
-    { value: 'Test Generation', label: 'Test Generation' },
-    { value: 'Complexity Analysis', label: 'Complexity Analysis' },
-    { value: 'Best Practices Check', label: 'Best Practices Check' },
-  ];
-
-  // Check if Process Code button should be shown
-  const shouldShowProcessButton = () => {
-    return (
-      (aiAction && aiAction !== 'Select action...') ||
-      (targetLanguage && targetLanguage !== '') ||
-      (instruction && instruction.trim() !== '')
-    );
-  };
-
-  // Handle AI Action execution
-  const handleAiAction = async () => {
-    if (!aiAction || aiAction === 'Select action...' || !detectedCode.trim()) {
-      setError('Please select an AI action and provide code.');
-      return;
-    }
-
-    setIsProcessingAiAction(true);
-    setError('');
-
-    try {
-      const actionPromptMap: Record<string, string> = {
-        "Summarize Code": `Summarize the following code in clear and concise language:\n\n${detectedCode}`,
-        "Optimize Performance": `Optimize the following code for performance without changing its functionality:\n\n${detectedCode}`,
-        "Convert Language": `Convert the following code to another programming language. Suggest a language too:\n\n${detectedCode}`,
-        "Generate Documentation": `Generate inline documentation and function-level comments for the following code:\n\n${detectedCode}`,
-        "Refactor Structure": `Refactor the following code to improve structure, readability, and modularity:\n\n${detectedCode}`,
-        "Security Analysis": `Analyze the following code for security vulnerabilities and suggest improvements:\n\n${detectedCode}`,
-        "Code Review": `Perform a comprehensive code review of the following code:\n\n${detectedCode}`,
-        "Debug Assistance": `Analyze the following code for potential bugs and debugging issues:\n\n${detectedCode}`,
-        "Test Generation": `Generate unit tests for the following code:\n\n${detectedCode}`,
-        "Complexity Analysis": `Analyze the time and space complexity of the following code:\n\n${detectedCode}`,
-        "Best Practices Check": `Check the following code against best practices and suggest improvements:\n\n${detectedCode}`,
-      };
-
-      const prompt = actionPromptMap[aiAction];
-      if (!prompt) {
-        setError('Invalid AI action selected.');
-        return;
-      }
-
-      // Use the existing API service to process the AI action
-      const result = await apiService.codeAssistant({
-        space_key: selectedSpace,
-        page_title: 'AI Action Processing',
-        instruction: prompt,
-        target_language: targetLanguage || undefined,
-      });
-
-      setAiActionOutput(result.summary || result.original_code || 'No output generated.');
-    } catch (err: any) {
-      setError(`Failed to run AI action: ${err.message || 'Unknown error'}`);
-      console.error('AI Action error:', err);
-    } finally {
-      setIsProcessingAiAction(false);
-    }
-  };
 
   // Load spaces on component mount
   useEffect(() => {
@@ -233,8 +117,18 @@ const CodeAssistant: React.FC<CodeAssistantProps> = ({ onClose, onFeatureSelect,
   };
 
   const processCode = async () => {
-    if (!selectedSpace || !selectedPage || !instruction.trim()) {
-      setError('Please fill in all required fields.');
+    if (!selectedSpace || !selectedPage) {
+      setError('Please select a space and page.');
+      return;
+    }
+
+    // Check if any option is selected
+    const hasModificationInstruction = instruction.trim() !== '';
+    const hasTargetLanguage = targetLanguage !== '';
+    const hasAiAction = aiAction !== '' && aiAction !== 'Select action...';
+
+    if (!hasModificationInstruction && !hasTargetLanguage && !hasAiAction) {
+      setError('Please provide a modification instruction, select a target language, or choose an AI action.');
       return;
     }
 
@@ -242,20 +136,28 @@ const CodeAssistant: React.FC<CodeAssistantProps> = ({ onClose, onFeatureSelect,
     setError('');
 
     try {
-      const result = await apiService.codeAssistant({
-        space_key: selectedSpace,
-        page_title: selectedPage,
-        instruction: instruction,
-        target_language: targetLanguage || undefined
-      });
+      // If AI action is selected, process it first
+      if (hasAiAction) {
+        await runAiAction();
+      }
 
-      // Prioritize converted code if target language is selected, otherwise use modified code
-      if (targetLanguage && result.converted_code) {
-        setProcessedCode(result.converted_code);
-      } else if (result.modified_code) {
-        setProcessedCode(result.modified_code);
-      } else {
-        setProcessedCode(result.original_code || '');
+      // If modification instruction or target language is selected, process with API
+      if (hasModificationInstruction || hasTargetLanguage) {
+        const result = await apiService.codeAssistant({
+          space_key: selectedSpace,
+          page_title: selectedPage,
+          instruction: instruction,
+          target_language: targetLanguage || undefined
+        });
+
+        // Prioritize converted code if target language is selected, otherwise use modified code
+        if (targetLanguage && result.converted_code) {
+          setProcessedCode(result.converted_code);
+        } else if (result.modified_code) {
+          setProcessedCode(result.modified_code);
+        } else {
+          setProcessedCode(result.original_code || '');
+        }
       }
     } catch (err) {
       setError('Failed to process code. Please try again.');
@@ -263,6 +165,48 @@ const CodeAssistant: React.FC<CodeAssistantProps> = ({ onClose, onFeatureSelect,
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const runAiAction = async () => {
+    if (!aiAction || aiAction === 'Select action...' || !detectedCode) {
+      return;
+    }
+
+    const actionPromptMap: Record<string, string> = {
+      "Summarize Code": `Summarize the following code in clear and concise language:\n\n${detectedCode}`,
+      "Optimize Performance": `Optimize the following code for performance without changing its functionality:\n\n${detectedCode}`,
+      "Convert Language": `Convert the following code to another programming language. Suggest a language too:\n\n${detectedCode}`,
+      "Generate Documentation": `Generate inline documentation and function-level comments for the following code:\n\n${detectedCode}`,
+      "Refactor Structure": `Refactor the following code to improve structure, readability, and modularity:\n\n${detectedCode}`,
+      "Security Analysis": `Analyze the following code for security vulnerabilities and suggest improvements:\n\n${detectedCode}`,
+    };
+
+    try {
+      const prompt = actionPromptMap[aiAction];
+      if (!prompt) return;
+
+      // For now, we'll use the same API service but with a special instruction
+      const result = await apiService.codeAssistant({
+        space_key: selectedSpace,
+        page_title: selectedPage,
+        instruction: prompt
+      });
+
+      setAiActionOutput(result.summary || result.modified_code || 'AI action completed successfully.');
+    } catch (err) {
+      setError(`Failed to run AI action: ${err}`);
+      console.error('Error running AI action:', err);
+    }
+  };
+
+  // Helper function to check if Process Code button should be enabled
+  const canProcessCode = () => {
+    const hasSpaceAndPage = selectedSpace && selectedPage;
+    const hasModificationInstruction = instruction.trim() !== '';
+    const hasTargetLanguage = targetLanguage !== '';
+    const hasAiAction = aiAction !== '' && aiAction !== 'Select action...';
+    
+    return hasSpaceAndPage && (hasModificationInstruction || hasTargetLanguage || hasAiAction);
   };
 
   const exportCode = async (format: string) => {
@@ -387,6 +331,39 @@ const CodeAssistant: React.FC<CodeAssistantProps> = ({ onClose, onFeatureSelect,
                   </div>
                 </div>
 
+                {/* AI Actions */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    AI Actions
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={aiAction}
+                      onChange={(e) => setAiAction(e.target.value)}
+                      className="w-full p-3 border border-white/30 rounded-lg focus:ring-2 focus:ring-confluence-blue focus:border-confluence-blue appearance-none bg-white/70 backdrop-blur-sm"
+                    >
+                      {aiActions.map(action => (
+                        <option key={action} value={action}>{action}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                  </div>
+                </div>
+
+                {/* AI Action Output */}
+                {aiActionOutput && (
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      AI Action Output
+                    </label>
+                    <div className="bg-gray-900/90 backdrop-blur-sm rounded-lg p-4 border border-white/10 max-h-32 overflow-auto">
+                      <pre className="text-sm text-gray-300">
+                        <code>{aiActionOutput}</code>
+                      </pre>
+                    </div>
+                  </div>
+                )}
+
                 {/* Instruction Input */}
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -413,30 +390,9 @@ const CodeAssistant: React.FC<CodeAssistantProps> = ({ onClose, onFeatureSelect,
                       className="w-full p-3 border border-white/30 rounded-lg focus:ring-2 focus:ring-confluence-blue focus:border-confluence-blue appearance-none bg-white/70 backdrop-blur-sm"
                     >
                       <option value="">Keep original language</option>
-                      {targetLanguageOptions.map(lang => (
-                        <option key={lang.value} value={lang.value}>
-                          {lang.label}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
-                  </div>
-                </div>
-
-                {/* AI Action Selection */}
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    AI Action
-                  </label>
-                  <div className="relative">
-                    <select
-                      value={aiAction}
-                      onChange={(e) => setAiAction(e.target.value)}
-                      className="w-full p-3 border border-white/30 rounded-lg focus:ring-2 focus:ring-confluence-blue focus:border-confluence-blue appearance-none bg-white/70 backdrop-blur-sm"
-                    >
-                      {aiActionOptions.map(action => (
-                        <option key={action.value} value={action.value}>
-                          {action.label}
+                      {outputFormats.map(format => (
+                        <option key={format} value={format}>
+                          {format.charAt(0).toUpperCase() + format.slice(1)}
                         </option>
                       ))}
                     </select>
@@ -460,66 +416,24 @@ const CodeAssistant: React.FC<CodeAssistantProps> = ({ onClose, onFeatureSelect,
 
                 {/* Process Button */}
                 <button
-                  onClick={aiAction !== 'Select action...' ? handleAiAction : processCode}
-                  disabled={!selectedSpace || !selectedPage || (!instruction.trim() && aiAction === 'Select action...') || isProcessing || isProcessingAiAction}
+                  onClick={processCode}
+                  disabled={!canProcessCode() || isProcessing}
                   className="w-full bg-confluence-blue/90 backdrop-blur-sm text-white py-3 px-4 rounded-lg hover:bg-confluence-blue disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center space-x-2 transition-colors border border-white/10"
                 >
-                  {isProcessingAiAction ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      <span>Processing AI Action...</span>
-                    </>
-                  ) : isProcessing ? (
+                  {isProcessing ? (
                     <>
                       <Loader2 className="w-5 h-5 animate-spin" />
                       <span>Processing...</span>
                     </>
-                  ) : aiAction !== 'Select action...' ? (
-                    <>
-                      <Zap className="w-5 h-5" />
-                      <span>Run AI Action</span>
-                    </>
                   ) : (
                     <>
-                      <Send className="w-5 h-5" />
+                      <Zap className="w-5 h-5" />
                       <span>Process Code</span>
                     </>
                   )}
                 </button>
               </div>
             </div>
-
-            {/* AI Action Output */}
-            {aiActionOutput && (
-              <div className="bg-white/60 backdrop-blur-xl rounded-xl p-6 border border-white/20 shadow-lg mb-6">
-                <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
-                  <Zap className="w-5 h-5 mr-2 text-confluence-blue" />
-                  AI Action Output: {aiAction}
-                </h3>
-                <div className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto">
-                  <pre className="whitespace-pre-wrap text-sm">
-                    <code>{aiActionOutput}</code>
-                  </pre>
-                </div>
-                <div className="mt-4 flex space-x-2">
-                  <button
-                    onClick={() => {
-                      setInstruction(aiActionOutput);
-                      setAiActionOutput('');
-                    }}
-                    className="px-4 py-2 bg-confluence-blue/90 text-white rounded-lg hover:bg-confluence-blue transition-colors text-sm"
-                  >
-                    Use as Instruction
-                  </button>
-                  <button
-                    onClick={() => setAiActionOutput('')}
-                    className="px-4 py-2 bg-gray-500/90 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm"
-                  >
-                    Clear Output
-                  </button>
-                </div>
-              </div>
-            )}
 
             {/* Middle Column - Original Code */}
             <div className="space-y-6">
