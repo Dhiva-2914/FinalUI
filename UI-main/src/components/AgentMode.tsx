@@ -546,9 +546,12 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
     handleGoalSubmit();
   };
 
-  // Calculate progress percentage, clamp to 100% if complete
+  // Calculate progress percentage based on current step
   const progressPercent = planSteps.length === 0 ? 0 :
-    (currentStep + 1 >= planSteps.length ? 100 : Math.round(((currentStep + 1) / planSteps.length) * 100));
+    currentStep === 0 ? 0 :
+    currentStep === 1 && planSteps[0]?.status === 'completed' ? 50 :
+    currentStep >= planSteps.length - 1 ? 100 :
+    Math.round(((currentStep + 1) / planSteps.length) * 100);
 
   return (
     <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-40 p-4">
@@ -664,6 +667,46 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
                 </div>
                 {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
               </div>
+              {/* Live Progress Log - in row with selectors, faded when output appears */}
+              {planSteps.length > 0 && (
+                <div className={`bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg transition-opacity duration-500 ${outputTabs.length > 0 ? 'opacity-50' : 'opacity-100'}`}>
+                  <h3 className="font-semibold text-gray-800 mb-4">Live Progress Log</h3>
+                  <div className="space-y-4">
+                    {planSteps.map((step, index) => (
+                      <div key={step.id} className="flex items-start space-x-3">
+                        <div className="flex-shrink-0 mt-1">
+                          {step.status === 'completed' ? (
+                            <CheckCircle className="w-5 h-5 text-green-500" />
+                          ) : step.status === 'running' ? (
+                            <Loader2 className="w-5 h-5 text-orange-500 animate-spin" />
+                          ) : (
+                            <div className="w-5 h-5 border-2 border-gray-300 rounded-full" />
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium text-gray-800">{step.title}</div>
+                          {step.details && (
+                            <div className="text-sm text-gray-600 mt-1">{step.details}</div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Progress Bar */}
+                  <div className="mt-6">
+                    <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
+                      <span>Progress</span>
+                      <span>{progressPercent}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-orange-500 h-2 rounded-full transition-all duration-500"
+                        style={{ width: `${progressPercent}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
               {/* Chat Section - always present */}
               <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg mb-4">
                 <h3 className="font-semibold text-gray-800 mb-2 flex items-center"><MessageSquare className="w-5 h-5 mr-2 text-orange-500" /> Chat</h3>
@@ -673,13 +716,13 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
                     placeholder="Type your instruction..."
-                    className="flex-1 p-2 border border-white/30 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white/70 backdrop-blur-sm mb-0"
+                    className="flex-1 p-2 border border-white/30 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white/70 backdrop-blur-sm mb-0"
                     onKeyPress={(e) => e.key === 'Enter' && handleChatSubmit()}
                   />
                   <button
                     onClick={handleChatSubmit}
                     disabled={!chatInput.trim() || !selectedSpace || !selectedPages.length}
-                    className="px-2 py-1 bg-orange-500/90 backdrop-blur-sm text-white rounded-lg hover:bg-orange-600 disabled:bg-gray-300 transition-colors flex items-center justify-center border border-white/10 text-xs"
+                    className="px-2 py-1 bg-orange-500/90 backdrop-blur-sm text-white rounded-xl hover:bg-orange-600 disabled:bg-gray-300 transition-colors flex items-center justify-center border border-white/10 text-xs"
                     style={{ minWidth: 0 }}
                   >
                     <Send className="w-4 h-4" />
@@ -760,7 +803,7 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
                       <button
                         onClick={() => handleGoalSubmit()}
                         disabled={!goal.trim() || !selectedSpace || !selectedPages.length}
-                        className="absolute bottom-4 right-4 bg-orange-500/90 backdrop-blur-sm text-white p-3 rounded-lg hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center space-x-2 transition-colors border border-white/10"
+                        className="absolute bottom-4 right-4 bg-orange-500/90 backdrop-blur-sm text-white p-3 rounded-xl hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center space-x-2 transition-colors border border-white/10"
                       >
                         <Send className="w-5 h-5" />
                       </button>
@@ -809,7 +852,7 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
                                   {Object.keys(outputTabs.find(tab => tab.id === 'final-answer').pageOutputs).map(page => (
                                     <button
                                       key={page}
-                                      className={`px-3 py-1 rounded text-xs font-semibold border ${selectedFinalPage === page ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-orange-600 border-orange-300 hover:bg-orange-100'} transition-colors`}
+                                      className={`px-3 py-1 rounded-xl text-xs font-semibold border ${selectedFinalPage === page ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-orange-600 border-orange-300 hover:bg-orange-100'} transition-colors`}
                                       onClick={() => setSelectedFinalPage(page)}
                                     >
                                       {page}
@@ -817,7 +860,29 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
                                   ))}
                                 </div>
                                 <div className="whitespace-pre-wrap text-gray-700">
-                                  {outputTabs.find(tab => tab.id === 'final-answer').pageOutputs[selectedFinalPage || Object.keys(outputTabs.find(tab => tab.id === 'final-answer').pageOutputs)[0]] || 'No output for this page.'}
+                                  {(() => {
+                                    const content = outputTabs.find(tab => tab.id === 'final-answer').pageOutputs[selectedFinalPage || Object.keys(outputTabs.find(tab => tab.id === 'final-answer').pageOutputs)[0]] || 'No output for this page.';
+                                    // Format content like in tool mode
+                                    return content.split('\n').map((line, index) => {
+                                      if (line.startsWith('### ')) {
+                                        return <h3 key={index} className="text-lg font-bold text-gray-800 mt-4 mb-2">{line.substring(4)}</h3>;
+                                      } else if (line.startsWith('## ')) {
+                                        return <h2 key={index} className="text-xl font-bold text-gray-800 mt-6 mb-3">{line.substring(3)}</h2>;
+                                      } else if (line.startsWith('# ')) {
+                                        return <h1 key={index} className="text-2xl font-bold text-gray-800 mt-8 mb-4">{line.substring(2)}</h1>;
+                                      } else if (line.startsWith('- **')) {
+                                        const match = line.match(/- \*\*(.*?)\*\*: (.*)/);
+                                        if (match) {
+                                          return <p key={index} className="mb-2"><strong>{match[1]}:</strong> {match[2]}</p>;
+                                        }
+                                      } else if (line.startsWith('- ')) {
+                                        return <p key={index} className="mb-1 ml-4">• {line.substring(2)}</p>;
+                                      } else if (line.trim()) {
+                                        return <p key={index} className="mb-2 text-gray-700">{line}</p>;
+                                      }
+                                      return <br key={index} />;
+                                    });
+                                  })()}
                                 </div>
                               </div>
                             ) : (
@@ -836,7 +901,7 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
                                       return <p key={index} className="mb-2"><strong>{match[1]}:</strong> {match[2]}</p>;
                                     }
                                   } else if (line.startsWith('- ')) {
-                                    return <p key={index} className="mb-1 ml-4"> 2 {line.substring(2)}</p>;
+                                    return <p key={index} className="mb-1 ml-4">• {line.substring(2)}</p>;
                                   } else if (line.trim()) {
                                     return <p key={index} className="mb-2 text-gray-700">{line}</p>;
                                   }
@@ -856,14 +921,14 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
                 <div className="flex justify-end mt-8 space-x-4">
                   <button
                     onClick={exportPlan}
-                    className="px-6 py-3 bg-orange-500/90 text-white rounded-lg hover:bg-orange-600 transition-colors font-semibold shadow-md border border-white/10"
+                    className="px-6 py-3 bg-orange-500/90 text-white rounded-xl hover:bg-orange-600 transition-colors font-semibold shadow-md border border-white/10"
                   >
                     <Download className="w-5 h-5 inline-block mr-2" />
                     Export Plan
                   </button>
                   <button
                     onClick={replaySteps}
-                    className="px-6 py-3 bg-white/80 text-orange-600 rounded-lg hover:bg-orange-100 transition-colors font-semibold shadow-md border border-orange-200/50"
+                    className="px-6 py-3 bg-white/80 text-orange-600 rounded-xl hover:bg-orange-100 transition-colors font-semibold shadow-md border border-orange-200/50"
                   >
                     <RotateCcw className="w-5 h-5 inline-block mr-2" />
                     Replay Steps
