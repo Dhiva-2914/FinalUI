@@ -51,7 +51,8 @@ const CodeAssistant: React.FC<CodeAssistantProps> = ({ onClose, onFeatureSelect,
     'Optimize Performance', 
     'Generate Documentation',
     'Refactor Structure',
-    'Identify dead code'
+    'Identify dead code',
+    'Add Logging Statements'
   ];
 
   // Load spaces on component mount
@@ -188,8 +189,8 @@ const CodeAssistant: React.FC<CodeAssistantProps> = ({ onClose, onFeatureSelect,
       "Optimize Performance": `Optimize the following code for performance without changing its functionality, return only the updated code:\n\n${detectedCode}`,
       "Generate Documentation": `Generate inline documentation and function-level comments for the following code, return only the updated code by commenting the each line of the code.:\n\n${detectedCode}`,
       "Refactor Structure": `Refactor the following code to improve structure, readability, and modularity, return only the updated code:\n\n${detectedCode}`,
-      "Security Analysis": `Analyze the following code for security vulnerabilities and suggest improvements, return only the updated code:\n\n${detectedCode}`,
       "Identify dead code": `Analyze the following code for any unsued code or dead code, return only the updated code by removing the dead code:\n\n${detectedCode}`,
+      "Add Logging Statements": `Add appropriate logging statements to the following code for better traceability and debugging. Return only the updated code:\n\n${detectedCode}`,
     };
 
     try {
