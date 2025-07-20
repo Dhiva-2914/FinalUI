@@ -136,99 +136,301 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
       setCurrentStep(1);
       setPlanSteps((steps) => steps.map((s) => s.id === 2 ? { ...s, status: 'running' } : s));
       const toolResults: Record<string, any> = {};
-      // Run each tool, but catch errors individually and add warnings instead of aborting the whole process
-      if (toolsToUse.includes('ai_powered_search')) {
-        try {
-        const res = await apiService.search({
-          space_key: selectedSpace,
-          page_titles: selectedPagesFromAI,
-            query: usedGoal,
-        });
-        toolResults['AI Powered Search'] = res;
-        } catch (err: any) {
-          toolResults['AI Powered Search'] = { summary: '⚠️ Failed to run AI Powered Search: ' + (err.message || 'Unknown error') };
-      }
-      }
-      if (toolsToUse.includes('impact_analyzer') && selectedPagesFromAI.length >= 2) {
-        try {
-        const res = await apiService.impactAnalyzer({
-          space_key: selectedSpace,
-          old_page_title: selectedPagesFromAI[0],
-          new_page_title: selectedPagesFromAI[1],
-            question: usedGoal,
-        });
-        toolResults['Impact Analyzer'] = res;
-        } catch (err: any) {
-          toolResults['Impact Analyzer'] = { summary: '⚠️ Failed to run Impact Analyzer: ' + (err.message || 'Unknown error') };
-      }
-      }
-      if (toolsToUse.includes('code_assistant') && selectedPagesFromAI.length > 0) {
-        try {
-        const res = await apiService.codeAssistant({
-          space_key: selectedSpace,
-          page_title: selectedPagesFromAI[0],
-            instruction: usedGoal,
-        });
-        toolResults['Code Assistant'] = res;
-        } catch (err: any) {
-          toolResults['Code Assistant'] = { summary: '⚠️ Failed to run Code Assistant: ' + (err.message || 'Unknown error') };
-      }
-      }
-      if (toolsToUse.includes('video_summarizer') && selectedPagesFromAI.length > 0) {
-        try {
-          const res: any = await apiService.videoSummarizer({
-          space_key: selectedSpace,
-          page_title: selectedPagesFromAI[0],
-        });
-        toolResults['Video Summarizer'] = res;
-        } catch (err: any) {
-          toolResults['Video Summarizer'] = { summary: '⚠️ Failed to run Video Summarizer: ' + (err.message || 'Unknown error') };
-      }
-      }
-      if (toolsToUse.includes('test_support') && selectedPagesFromAI.length > 0) {
-        try {
-        const res = await apiService.testSupport({
-          space_key: selectedSpace,
-          code_page_title: selectedPagesFromAI[0],
-        });
-        toolResults['Test Support'] = res;
-        } catch (err: any) {
-          toolResults['Test Support'] = { summary: '⚠️ Failed to run Test Support: ' + (err.message || 'Unknown error') };
-      }
-      }
-      if (toolsToUse.includes('image_insights') && selectedPagesFromAI.length > 0) {
-        try {
-        const images = await apiService.getImages(selectedSpace, selectedPagesFromAI[0]);
-        if (images && images.images && images.images.length > 0) {
-          const summaries = await Promise.all(images.images.map((imgUrl: string) => apiService.imageSummary({
-            space_key: selectedSpace,
-            page_title: selectedPagesFromAI[0],
-            image_url: imgUrl,
-          })));
-          toolResults['Image Insights'] = summaries;
-        }
-        } catch (err: any) {
-          toolResults['Image Insights'] = { summary: '⚠️ Failed to run Image Insights: ' + (err.message || 'Unknown error') };
-      }
-      }
-      if (toolsToUse.includes('chart_builder') && selectedPagesFromAI.length > 0) {
-        try {
-        const images = await apiService.getImages(selectedSpace, selectedPagesFromAI[0]);
-        if (images && images.images && images.images.length > 0) {
-          const charts = await Promise.all(images.images.map((imgUrl: string) => apiService.createChart({
-            space_key: selectedSpace,
-            page_title: selectedPagesFromAI[0],
-            image_url: imgUrl,
-            chart_type: 'bar',
-            filename: 'chart',
-            format: 'png',
-          })));
-          toolResults['Chart Builder'] = charts;
+
+      // --- NEW LOGIC: Only run the relevant tool for the instruction and page(s) ---
+      // Helper functions to detect intent
+      const isSummarize = (instr: string) => /summari(s|z)e|summary|summarizing|summarise|summarize/.test(instr.toLowerCase());
+      const isConvertLanguage = (instr: string) => /convert.*language|translate.*code|change.*language/.test(instr.toLowerCase());
+      const isGraph = (instr: string) => /graph|chart|visualize|plot/.test(instr.toLowerCase());
+
+      // If only one page selected, do only the relevant task
+      if (selectedPagesFromAI.length === 1) {
+        const page = selectedPagesFromAI[0];
+        if (isConvertLanguage(usedGoal)) {
+          // Only run code assistant with target language
+          try {
+            const codeResult = await apiService.codeAssistant({
+              space_key: selectedSpace,
+              page_title: page,
+              instruction: usedGoal,
+              target_language: analysis.target_language || undefined
+            });
+            toolResults[page] = codeResult.converted_code || codeResult.modified_code || codeResult.original_code || 'No code output.';
+          } catch (err: any) {
+            toolResults[page] = 'Failed to convert language: ' + (err.message || 'Unknown error');
           }
-        } catch (err: any) {
-          toolResults['Chart Builder'] = { summary: '⚠️ Failed to run Chart Builder: ' + (err.message || 'Unknown error') };
+        } else if (isSummarize(usedGoal)) {
+          // Only run AI Powered Search for summarization
+          try {
+            const res = await apiService.search({
+              space_key: selectedSpace,
+              page_titles: [page],
+              query: usedGoal,
+            });
+            toolResults[page] = res.response || 'No summary output.';
+          } catch (err: any) {
+            toolResults[page] = 'Failed to summarize: ' + (err.message || 'Unknown error');
+          }
+        } else if (isGraph(usedGoal)) {
+          // Only run chart builder/image insights
+          try {
+            const images = await apiService.getImages(selectedSpace, page);
+            if (images && images.images && images.images.length > 0) {
+              const charts = await Promise.all(images.images.map((imgUrl: string, idx: number) => apiService.createChart({
+                space_key: selectedSpace,
+                page_title: page,
+                image_url: imgUrl,
+                chart_type: 'bar',
+                filename: `chart_${page.replace(/\s+/g, '_')}_${idx + 1}`,
+                format: 'png',
+              })));
+              toolResults[page] = charts.map((chart, idx) => `Chart ${idx + 1}: ${chart.chart_data ? JSON.stringify(chart.chart_data, null, 2) : 'Chart generated.'}`).join('\n\n');
+            } else {
+              toolResults[page] = 'No images found to create a graph.';
+            }
+          } catch (err: any) {
+            toolResults[page] = 'Failed to create graph: ' + (err.message || 'Unknown error');
+          }
+        } else {
+          // Default: run all tools as before
+          if (toolsToUse.includes('ai_powered_search')) {
+            try {
+            const res = await apiService.search({
+              space_key: selectedSpace,
+              page_titles: selectedPagesFromAI,
+                query: usedGoal,
+            });
+            toolResults['AI Powered Search'] = res;
+            } catch (err: any) {
+              toolResults['AI Powered Search'] = { summary: '⚠️ Failed to run AI Powered Search: ' + (err.message || 'Unknown error') };
+          }
+          }
+          if (toolsToUse.includes('impact_analyzer') && selectedPagesFromAI.length >= 2) {
+            try {
+            const res = await apiService.impactAnalyzer({
+              space_key: selectedSpace,
+              old_page_title: selectedPagesFromAI[0],
+              new_page_title: selectedPagesFromAI[1],
+                question: usedGoal,
+            });
+            toolResults['Impact Analyzer'] = res;
+            } catch (err: any) {
+              toolResults['Impact Analyzer'] = { summary: '⚠️ Failed to run Impact Analyzer: ' + (err.message || 'Unknown error') };
+          }
+          }
+          if (toolsToUse.includes('code_assistant') && selectedPagesFromAI.length > 0) {
+            try {
+            const res = await apiService.codeAssistant({
+              space_key: selectedSpace,
+              page_title: selectedPagesFromAI[0],
+                instruction: usedGoal,
+            });
+            toolResults['Code Assistant'] = res;
+            } catch (err: any) {
+              toolResults['Code Assistant'] = { summary: '⚠️ Failed to run Code Assistant: ' + (err.message || 'Unknown error') };
+          }
+          }
+          if (toolsToUse.includes('video_summarizer') && selectedPagesFromAI.length > 0) {
+            try {
+              const res: any = await apiService.videoSummarizer({
+              space_key: selectedSpace,
+              page_title: selectedPagesFromAI[0],
+            });
+            toolResults['Video Summarizer'] = res;
+            } catch (err: any) {
+              toolResults['Video Summarizer'] = { summary: '⚠️ Failed to run Video Summarizer: ' + (err.message || 'Unknown error') };
+          }
+          }
+          if (toolsToUse.includes('test_support') && selectedPagesFromAI.length > 0) {
+            try {
+            const res = await apiService.testSupport({
+              space_key: selectedSpace,
+              code_page_title: selectedPagesFromAI[0],
+            });
+            toolResults['Test Support'] = res;
+            } catch (err: any) {
+              toolResults['Test Support'] = { summary: '⚠️ Failed to run Test Support: ' + (err.message || 'Unknown error') };
+          }
+          }
+          if (toolsToUse.includes('image_insights') && selectedPagesFromAI.length > 0) {
+            try {
+            const images = await apiService.getImages(selectedSpace, selectedPagesFromAI[0]);
+            if (images && images.images && images.images.length > 0) {
+              const summaries = await Promise.all(images.images.map((imgUrl: string) => apiService.imageSummary({
+                space_key: selectedSpace,
+                page_title: selectedPagesFromAI[0],
+                image_url: imgUrl,
+              })));
+              toolResults['Image Insights'] = summaries;
+            }
+            } catch (err: any) {
+              toolResults['Image Insights'] = { summary: '⚠️ Failed to run Image Insights: ' + (err.message || 'Unknown error') };
+          }
+          }
+          if (toolsToUse.includes('chart_builder') && selectedPagesFromAI.length > 0) {
+            try {
+            const images = await apiService.getImages(selectedSpace, selectedPagesFromAI[0]);
+            if (images && images.images && images.images.length > 0) {
+              const charts = await Promise.all(images.images.map((imgUrl: string) => apiService.createChart({
+                space_key: selectedSpace,
+                page_title: selectedPagesFromAI[0],
+                image_url: imgUrl,
+                chart_type: 'bar',
+                filename: `chart_${page.replace(/\s+/g, '_')}_${idx + 1}`,
+                format: 'png',
+              })));
+              toolResults['Chart Builder'] = charts;
+              }
+            } catch (err: any) {
+              toolResults['Chart Builder'] = { summary: '⚠️ Failed to run Chart Builder: ' + (err.message || 'Unknown error') };
+            }
+          }
+        }
+      } else {
+        // Multiple pages: check if instruction is specific per page
+        for (const page of selectedPagesFromAI) {
+          let pageGoal = usedGoal;
+          // Optionally, parse instruction for per-page instructions (advanced: not implemented here)
+          if (isConvertLanguage(pageGoal)) {
+            try {
+              const codeResult = await apiService.codeAssistant({
+                space_key: selectedSpace,
+                page_title: page,
+                instruction: pageGoal,
+                target_language: analysis.target_language || undefined
+              });
+              toolResults[page] = codeResult.converted_code || codeResult.modified_code || codeResult.original_code || 'No code output.';
+            } catch (err: any) {
+              toolResults[page] = 'Failed to convert language: ' + (err.message || 'Unknown error');
+            }
+          } else if (isSummarize(pageGoal)) {
+            try {
+              const res = await apiService.search({
+                space_key: selectedSpace,
+                page_titles: [page],
+                query: pageGoal,
+              });
+              toolResults[page] = res.response || 'No summary output.';
+            } catch (err: any) {
+              toolResults[page] = 'Failed to summarize: ' + (err.message || 'Unknown error');
+            }
+          } else if (isGraph(pageGoal)) {
+            try {
+              const images = await apiService.getImages(selectedSpace, page);
+              if (images && images.images && images.images.length > 0) {
+                const charts = await Promise.all(images.images.map((imgUrl: string, idx: number) => apiService.createChart({
+                  space_key: selectedSpace,
+                  page_title: page,
+                  image_url: imgUrl,
+                  chart_type: 'bar',
+                  filename: `chart_${page.replace(/\s+/g, '_')}_${idx + 1}`,
+                  format: 'png',
+                })));
+                toolResults[page] = charts.map((chart, idx) => `Chart ${idx + 1}: ${chart.chart_data ? JSON.stringify(chart.chart_data, null, 2) : 'Chart generated.'}`).join('\n\n');
+              } else {
+                toolResults[page] = 'No images found to create a graph.';
+              }
+            } catch (err: any) {
+              toolResults[page] = 'Failed to create graph: ' + (err.message || 'Unknown error');
+            }
+          } else {
+            // Default: run all tools as before
+            if (toolsToUse.includes('ai_powered_search')) {
+              try {
+              const res = await apiService.search({
+                space_key: selectedSpace,
+                page_titles: [page],
+                query: usedGoal,
+              });
+              toolResults['AI Powered Search'] = res;
+              } catch (err: any) {
+                toolResults['AI Powered Search'] = { summary: '⚠️ Failed to run AI Powered Search: ' + (err.message || 'Unknown error') };
+              }
+            }
+            if (toolsToUse.includes('impact_analyzer') && selectedPagesFromAI.length >= 2) {
+              try {
+              const res = await apiService.impactAnalyzer({
+                space_key: selectedSpace,
+                old_page_title: selectedPagesFromAI[0],
+                new_page_title: selectedPagesFromAI[1],
+                question: usedGoal,
+              });
+              toolResults['Impact Analyzer'] = res;
+              } catch (err: any) {
+                toolResults['Impact Analyzer'] = { summary: '⚠️ Failed to run Impact Analyzer: ' + (err.message || 'Unknown error') };
+              }
+            }
+            if (toolsToUse.includes('code_assistant') && selectedPagesFromAI.length > 0) {
+              try {
+              const res = await apiService.codeAssistant({
+                space_key: selectedSpace,
+                page_title: selectedPagesFromAI[0],
+                instruction: usedGoal,
+              });
+              toolResults['Code Assistant'] = res;
+              } catch (err: any) {
+                toolResults['Code Assistant'] = { summary: '⚠️ Failed to run Code Assistant: ' + (err.message || 'Unknown error') };
+              }
+            }
+            if (toolsToUse.includes('video_summarizer') && selectedPagesFromAI.length > 0) {
+              try {
+                const res: any = await apiService.videoSummarizer({
+                space_key: selectedSpace,
+                page_title: selectedPagesFromAI[0],
+              });
+              toolResults['Video Summarizer'] = res;
+              } catch (err: any) {
+                toolResults['Video Summarizer'] = { summary: '⚠️ Failed to run Video Summarizer: ' + (err.message || 'Unknown error') };
+              }
+            }
+            if (toolsToUse.includes('test_support') && selectedPagesFromAI.length > 0) {
+              try {
+              const res = await apiService.testSupport({
+                space_key: selectedSpace,
+                code_page_title: selectedPagesFromAI[0],
+              });
+              toolResults['Test Support'] = res;
+              } catch (err: any) {
+                toolResults['Test Support'] = { summary: '⚠️ Failed to run Test Support: ' + (err.message || 'Unknown error') };
+              }
+            }
+            if (toolsToUse.includes('image_insights') && selectedPagesFromAI.length > 0) {
+              try {
+              const images = await apiService.getImages(selectedSpace, selectedPagesFromAI[0]);
+              if (images && images.images && images.images.length > 0) {
+                const summaries = await Promise.all(images.images.map((imgUrl: string) => apiService.imageSummary({
+                  space_key: selectedSpace,
+                  page_title: selectedPagesFromAI[0],
+                  image_url: imgUrl,
+                })));
+                toolResults['Image Insights'] = summaries;
+              }
+              } catch (err: any) {
+                toolResults['Image Insights'] = { summary: '⚠️ Failed to run Image Insights: ' + (err.message || 'Unknown error') };
+              }
+            }
+            if (toolsToUse.includes('chart_builder') && selectedPagesFromAI.length > 0) {
+              try {
+              const images = await apiService.getImages(selectedSpace, selectedPagesFromAI[0]);
+              if (images && images.images && images.images.length > 0) {
+                const charts = await Promise.all(images.images.map((imgUrl: string) => apiService.createChart({
+                  space_key: selectedSpace,
+                  page_title: selectedPagesFromAI[0],
+                  image_url: imgUrl,
+                  chart_type: 'bar',
+                  filename: `chart_${page.replace(/\s+/g, '_')}_${idx + 1}`,
+                  format: 'png',
+                })));
+                toolResults['Chart Builder'] = charts;
+                }
+              } catch (err: any) {
+                toolResults['Chart Builder'] = { summary: '⚠️ Failed to run Chart Builder: ' + (err.message || 'Unknown error') };
+              }
+            }
+          }
         }
       }
+      // --- END NEW LOGIC ---
       setPlanSteps((steps) => steps.map((s) => s.id === 2 ? { ...s, status: 'completed' } : s));
       setCurrentStep(planSteps.length - 1);
       const getRelevantOutput = (result: any) => {
