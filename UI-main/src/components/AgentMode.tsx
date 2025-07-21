@@ -59,7 +59,7 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
     const loadSpaces = async () => {
       try {
         const spaceData = await apiService.getSpaces();
-        setSpaces(spaceData.spaces.map(s => ({ value: s.key, label: s.name })));
+        setSpaces((spaceData.spaces || []).map(s => ({ value: s.key, label: s.name })));
       } catch (err) {
         setError('Failed to load spaces.');
       }
@@ -72,7 +72,7 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
       const loadPages = async () => {
         try {
           const pageData = await apiService.getPages(selectedSpace.value);
-          setPages(pageData.pages.map(p => ({ value: p, label: p })));
+          setPages((pageData.pages || []).map(p => ({ value: p, label: p })));
         } catch (err) {
           setError('Failed to load pages for the selected space.');
         }
@@ -108,11 +108,11 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
     setProgressPercentage(0);
 
     try {
-        const pageTitles = selectedPages.map(p => p.value);
+        const pageTitles = (selectedPages || []).map(p => p.value);
         const analysis = await analyzeGoal(usedGoal, pageTitles);
 
         setOrchestrationReasoning(analysis.reasoning || 'Analysis complete.');
-        const toolsInPlan = Array.from(new Set(analysis.plan.map(step => step.tool)));
+        const toolsInPlan = Array.from(new Set((analysis?.plan || []).map(step => step.tool)));
         setUsedTools(toolsInPlan);
         setProgressPercentage(50);
 
@@ -136,7 +136,7 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
         }
 
         setPageOutputs(newPageOutputs);
-        setOutputTabs(selectedPages.map(p => ({ id: p.value, label: p.label, icon: FileText, content: newPageOutputs[p.value] || '' })));
+        setOutputTabs((selectedPages || []).map(p => ({ id: p.value, label: p.label, icon: FileText, content: newPageOutputs[p.value] || '' })));
         setActiveTab(selectedPages[0]?.value || '');
         setProgressPercentage(100);
 
