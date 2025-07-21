@@ -24,30 +24,6 @@ interface OutputTab {
   pageOutputs?: Record<string, string>;
 }
 
-// Helper functions for intent and page extraction
-function extractPageNames(sentence: string, allPages: string[]): string[] {
-  // Try to match any page name in the sentence
-  return allPages.filter(page => sentence.toLowerCase().includes(page.toLowerCase()));
-}
-function isSummarizeText(sentence: string) {
-  return /summari(s|z)e.*(text|para|document)/i.test(sentence);
-}
-function isSummarizeVideo(sentence: string) {
-  return /summari(s|z)e.*video/i.test(sentence);
-}
-function isConvertCode(sentence: string) {
-  return /convert.*code.*to/i.test(sentence);
-}
-function isGraph(sentence: string) {
-  return /graph|chart|visualize/i.test(sentence);
-}
-function isImpact(sentence: string) {
-  return /impact.*analy(s|z)e/i.test(sentence);
-}
-function isTestSupport(sentence: string) {
-  return /test.*support|test.*strategy/i.test(sentence);
-}
-
 const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
   const [goal, setGoal] = useState('');
   const [isPlanning, setIsPlanning] = useState(false);
@@ -481,196 +457,104 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
       
       // Create individual outputs for each selected page
       for (const page of selectedPagesFromAI) {
-        let pageOutput = '';
-        let aiSearchOutput = '';
-        let videoSummaryOutput = '';
-        let graphOutput = '';
-        let codeAssistantOutput = '';
-        let imageInsightsOutput = '';
-        let impactAnalyzerOutput = '';
-        let testSupportOutput = '';
+        const pageInstruction = usedGoal.toLowerCase(); // Use the same instruction for each page for now
+        let pageOutputParts: string[] = [];
         let pageErrors: string[] = [];
-        
-        // Always try to get comprehensive analysis for each page regardless of instruction
-        try {
-          // 1. AI Search for general content analysis
-          const pageSpecificResult = await apiService.search({
-            space_key: selectedSpace,
-            page_titles: [page],
-            query: usedGoal,
-          });
-          if (pageSpecificResult && pageSpecificResult.response) {
-            aiSearchOutput = `### AI Search Analysis\n${pageSpecificResult.response}`;
-          }
-        } catch (err: any) {
-          pageErrors.push(`Search failed: ${err.message || 'Unknown error'}`);
-          console.error(`Search failed for page ${page}:`, err);
+        let actionTaken = false;
+
+        // --- Tool Execution based on Instruction ---
+
+        // 1. Summarize Text (AIPoweredSearch)
+        if (pageInstruction.includes('summarize') && (pageInstruction.includes('text') || pageInstruction.includes('para') || pageInstruction.includes('document'))) {
+          actionTaken = true;
+          try {
+            const res = await apiService.search({ space_key: selectedSpace, page_titles: [page], query: usedGoal });
+            if (res.response) pageOutputParts.push(`### Text Summary\n${res.response}`);
+          } catch (err: any) { pageErrors.push(`Text Summary Failed: ${err.message}`); }
         }
-        
-        // 2. Video Analysis - always try to process videos if available
-        try {
-          const videoResult = await apiService.videoSummarizer({
-            space_key: selectedSpace,
-            page_title: page,
-          });
-          // Instead of assigning JSX directly to pageOutput, build a markdown or HTML string for video/chart outputs.
-          // For video summarization:
-          if (videoResult && (isSummarize(usedGoal) || videoResult.summary)) {
-            let videoOutput = '#### Key Quotes\n';
-            if (videoResult.quotes && videoResult.quotes.length > 0) {
-              videoOutput += videoResult.quotes.map(q => `> ${q}`).join('\n\n');
-            }
-            videoOutput += '\n\n#### Timestamps\n';
-            if (videoResult.timestamps && videoResult.timestamps.length > 0) {
-              videoOutput += videoResult.timestamps.map(t => `- ${t}`).join('\n');
-            }
-            pageOutput = videoOutput;
-          }
-        } catch (err: any) {
-          // Only log as error if it's not a "no video found" type error
-          if (!err.message?.includes('no video') && !err.message?.includes('not found')) {
-            pageErrors.push(`Video analysis failed: ${err.message || 'Unknown error'}`);
-            console.error(`Video analysis failed for page ${page}:`, err);
-          }
-        }
-        
-        // 3. Image Analysis and Graph Creation - always try to process images
-        try {
-          const images = await apiService.getImages(selectedSpace, page);
-          if (images && images.images && images.images.length > 0) {
-            // Process each image for insights
-            const imagePromises = images.images.map(async (imgUrl: string, index: number) => {
-              try {
-                // Get image insights
-                const imageInsight = await apiService.imageSummary({
-                  space_key: selectedSpace,
-                  page_title: page,
-                  image_url: imgUrl,
-                });
-                
-                // Try to create charts for each image
-                let chartResult = null;
-                try {
-                  chartResult = await apiService.createChart({
-                    space_key: selectedSpace,
-                    page_title: page,
-                    image_url: imgUrl,
-                    chart_type: 'bar', // Default chart type
-                    filename: `chart_${page.replace(/\s+/g, '_')}_${index + 1}`,
-                    format: 'png',
-                  });
-                } catch (chartErr) {
-                  console.log(`Chart creation failed for image ${index + 1}:`, chartErr);
-                }
-                
-                return {
-                  insight: imageInsight,
-                  chart: chartResult,
-                  imageUrl: imgUrl,
-                  index: index + 1
-                };
-              } catch (err: any) {
-                console.error(`Failed to process image ${index + 1} for page ${page}:`, err);
-                return null;
+
+        // 2. Summarize Video
+        if (pageInstruction.includes('summarize') && pageInstruction.includes('video')) {
+          actionTaken = true;
+          try {
+            const videoResult = await apiService.videoSummarizer({ space_key: selectedSpace, page_title: page });
+            if (videoResult && videoResult.summary) {
+              let videoOutput = '### Video Summary\n';
+              if (videoResult.quotes && videoResult.quotes.length > 0) {
+                videoOutput += '#### Key Quotes\n' + videoResult.quotes.map(q => `> ${q}`).join('\n\n');
               }
-            });
-            
-            const imageResults = await Promise.all(imagePromises);
-            const successfulResults = imageResults.filter(result => result !== null);
-            
-            if (successfulResults.length > 0) {
-              imageInsightsOutput = `### Image Analysis\n\n**Page:** ${page}\n**Images Found:** ${successfulResults.length}/${images.images.length}\n\n`;
-              
-              successfulResults.forEach((result) => {
-                imageInsightsOutput += `#### Image ${result.index}\n`;
-                imageInsightsOutput += `**Analysis:** ${result.insight?.summary || 'Analysis not available'}\n\n`;
-                
-                if (result.chart) {
-                  imageInsightsOutput += `**Generated Chart:** Chart data available\n\n`;
-                  if (result.chart.chart_data) {
-                    imageInsightsOutput += `**Chart Data:**\n\`\`\`json\n${JSON.stringify(result.chart.chart_data, null, 2)}\n\`\`\`\n\n`;
-                  }
-                }
-                imageInsightsOutput += `---\n\n`;
-              });
+              if (videoResult.timestamps && videoResult.timestamps.length > 0) {
+                videoOutput += '\n\n#### Timestamps\n' + videoResult.timestamps.map(t => `- ${t}`).join('\n');
+              }
+              pageOutputParts.push(videoOutput);
             }
-          }
-        } catch (err: any) {
-          pageErrors.push(`Image analysis failed: ${err.message || 'Unknown error'}`);
-          console.error(`Failed to process images for page ${page}:`, err);
+          } catch (err: any) { /* Gracefully ignore if no video, etc. */ }
+        }
+
+        // 3. Convert Code (CodeAssistant)
+        if (pageInstruction.includes('convert') && pageInstruction.includes('code')) {
+          actionTaken = true;
+          try {
+            const codeResult = await apiService.codeAssistant({ space_key: selectedSpace, page_title: page, instruction: usedGoal });
+            if (codeResult.converted_code) {
+              pageOutputParts.push(`### Code Conversion\n\`\`\`${codeResult.target_language || ''}\n${codeResult.converted_code}\n\`\`\``);
+            }
+          } catch (err: any) { /* Gracefully ignore if no code */ }
         }
         
-        // 4. Code Analysis - always try to analyze code content
-        try {
-          const codeResult = await apiService.codeAssistant({
-            space_key: selectedSpace,
-            page_title: page,
-            instruction: usedGoal,
-          });
-          if (codeResult && codeResult.summary) {
-            codeAssistantOutput = `### Code Analysis\n${codeResult.summary}`;
-          }
-        } catch (err: any) {
-          // Only log as error if it's not a "no code found" type error
-          if (!err.message?.includes('no code') && !err.message?.includes('not found')) {
-            pageErrors.push(`Code analysis failed: ${err.message || 'Unknown error'}`);
-            console.error(`Code analysis failed for page ${page}:`, err);
-          }
+        // 4. Create Graph (ImageInsights)
+        if (pageInstruction.includes('create') && (pageInstruction.includes('graph') || pageInstruction.includes('chart'))) {
+          actionTaken = true;
+          try {
+            const images = await apiService.getImages(selectedSpace, page);
+            if (images && images.images && images.images.length > 0) {
+              const imgUrl = images.images[0]; // Process first image
+              const chartResult = await apiService.createChart({
+                space_key: selectedSpace,
+                page_title: page,
+                image_url: imgUrl,
+                chart_type: 'bar', // Can be enhanced to parse from instruction
+                filename: 'chart',
+                format: 'png',
+              });
+              if (chartResult && chartResult.chart_data) {
+                let chartOutput = '### Generated Graph\nChart data generated successfully.';
+                // If chart_url is part of the response, it would be added here
+                pageOutputParts.push(chartOutput);
+              }
+            } else {
+               pageOutputParts.push('### Generated Graph\nNo images found on the page to create a graph.');
+            }
+          } catch (err: any) { pageErrors.push(`Graph Creation Failed: ${err.message}`); }
+        }
+
+        // 5. Impact Analysis
+        if (pageInstruction.includes('impact') && selectedPagesFromAI.length >= 2) {
+            actionTaken = true;
+            try {
+                const impactResult = await apiService.impactAnalyzer({
+                    space_key: selectedSpace,
+                    old_page_title: selectedPagesFromAI[0], // simplified assumption
+                    new_page_title: selectedPagesFromAI[1], // simplified assumption
+                    question: usedGoal,
+                });
+                if (impactResult.impact_analysis) {
+                    pageOutputParts.push(`### Impact Analysis\n${impactResult.impact_analysis}`);
+                }
+            } catch (err: any) { pageErrors.push(`Impact Analysis Failed: ${err.message}`); }
         }
         
-        // 5. Impact Analysis - always try to analyze impact
-        try {
-          const impactResult = await apiService.impactAnalyzer({
-            space_key: selectedSpace,
-            old_page_title: page,
-            new_page_title: page,
-            question: usedGoal,
-          });
-          if (impactResult && impactResult.impact_analysis) {
-            impactAnalyzerOutput = `### Impact Analysis\n${impactResult.impact_analysis}`;
+        // Final Output Assembly
+        if (actionTaken) {
+          if (pageOutputParts.length > 0) {
+            pageOutputs[page] = pageOutputParts.join('\n\n---\n\n');
           }
-        } catch (err: any) {
-          pageErrors.push(`Impact analysis failed: ${err.message || 'Unknown error'}`);
-          console.error(`Impact analysis failed for page ${page}:`, err);
-        }
-        
-        // 6. Test Support Analysis - always try to analyze test-related content
-        try {
-          const testResult = await apiService.testSupport({
-            space_key: selectedSpace,
-            code_page_title: page,
-            question: usedGoal,
-          });
-          if (testResult && testResult.test_strategy) {
-            testSupportOutput = `### Test Support Analysis\n${testResult.test_strategy}`;
+          if (pageErrors.length > 0) {
+            pageOutputs[page] = (pageOutputs[page] || '') + '\n\n### Errors\n' + pageErrors.join('\n');
           }
-        } catch (err: any) {
-          pageErrors.push(`Test support analysis failed: ${err.message || 'Unknown error'}`);
-          console.error(`Test support analysis failed for page ${page}:`, err);
-        }
-        
-        // Combine all outputs
-        const outputs = [
-          aiSearchOutput, 
-          videoSummaryOutput, 
-          imageInsightsOutput, 
-          codeAssistantOutput, 
-          impactAnalyzerOutput, 
-          testSupportOutput
-        ].filter(Boolean);
-        
-        if (outputs.length > 0) {
-          pageOutput = outputs.join('\n\n');
         } else {
-          pageOutput = `### Analysis for "${page}"\n\n**Status:** No content found or all analysis attempts failed.\n\n`;
+          pageOutputs[page] = "No specific action was requested. Please provide a clear instruction (e.g., 'summarize the video', 'convert the code to python').";
         }
-        
-        // Add error summary if there were any errors
-        if (pageErrors.length > 0) {
-          pageOutput += `\n### Errors Encountered\n\n${pageErrors.map(error => `- ${error}`).join('\n')}\n\n`;
-        }
-        
-        pageOutputs[page] = pageOutput;
       }
       // If no pages were processed, create a general output
       if (Object.keys(pageOutputs).length === 0) {
