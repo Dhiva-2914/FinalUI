@@ -305,7 +305,7 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
                             <Zap size={16} className="mr-2 text-yellow-500 flex-shrink-0" />
                             <strong>Used Tools:</strong>
                             <div className="ml-2 flex flex-wrap gap-1">
-                            {usedTools.map((tool, index) => (
+                            {(usedTools || []).map((tool, index) => (
                                 <span key={index} className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs">
                                 {tool}
                                 </span>
@@ -320,7 +320,7 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
                         <strong>Selected Pages:</strong>
                     </div>
                     <div className="ml-2 mt-1 flex flex-col items-start gap-1">
-                      {selectedPages.map((page) => (
+                      {(selectedPages || []).map((page) => (
                         <span key={page.value} className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
                           {page.label}
                         </span>
@@ -329,7 +329,7 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
                 </div>
             </div>
             <div className="flex space-x-2 border-b mb-4">
-              {outputTabs.map((tab) => (
+              {(outputTabs || []).map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
