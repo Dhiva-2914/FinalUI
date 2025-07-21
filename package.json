@@ -1,9 +1,0 @@
-{
-  "dependencies": {
-    "react-markdown": "^10.1.0",
-    "react-select": "^5.10.2"
-  },
-  "devDependencies": {
-    "@types/react-select": "^5.0.0"
-  }
-}
