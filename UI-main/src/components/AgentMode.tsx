@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Select from 'react-select';
 import { Zap, X, Send, Brain, Loader2, MessageSquare, FileText, PanelLeftClose } from 'lucide-react';
 import type { AppMode } from '../App';
-import { apiService, analyzeGoal, videoSummarizer, createChart } from '../services/api';
+import { apiService, analyzeGoal } from '../services/api';
 import ReactMarkdown from 'react-markdown';
 import CodeMirror from '@uiw/react-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
@@ -123,10 +123,10 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
             // Simplified logic: In a real scenario, you'd iterate through analysis.plan
             // and call the specific tool for the page.
             if (usedGoal.toLowerCase().includes('summarize a video')) {
-                const videoResponse = await videoSummarizer({ space_key: selectedSpace.value, page_title: page.value, file_name: '' });
+                const videoResponse = await apiService.videoSummarizer({ space_key: selectedSpace.value, page_title: page.value, file_name: '' });
                 pageOutputContent = videoResponse.summary;
             } else if (usedGoal.toLowerCase().includes('create a graph')) {
-                const chartResponse = await createChart({ space_key: selectedSpace.value, page_title: page.value, file_name: '' });
+                const chartResponse = await apiService.createChart({ space_key: selectedSpace.value, page_title: page.value, file_name: '' });
                 pageOutputContent = `![Chart](data:image/png;base64,${chartResponse.chart})`
             } else {
                 const searchResponse = await apiService.search({ space_key: selectedSpace.value, page_titles: [page.value], query: usedGoal });
