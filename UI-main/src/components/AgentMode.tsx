@@ -433,25 +433,11 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
       // --- END NEW LOGIC ---
       setPlanSteps((steps) => steps.map((s) => s.id === 2 ? { ...s, status: 'completed' } : s));
       setCurrentStep(planSteps.length - 1);
-      const getRelevantOutput = (result: any) => {
-        if (!result) return '';
-        if (typeof result === 'string') return result;
-        if (result.summary) return result.summary;
-        if (result.impact_analysis) return result.impact_analysis;
-        if (result.modified_code) return result.modified_code;
-        if (result.converted_code) return result.converted_code;
-        if (result.original_code) return result.original_code;
-        if (result.response) return result.response;
-        if (result.test_strategy) return result.test_strategy;
-        if (result.chart_data) return '[Chart Image]';
-        if (Array.isArray(result) && result.length > 0) return getRelevantOutput(result[0]);
-        return '';
-      };
-      const usedToolsContent = Object.entries(toolResults).map(([tool, result]) => {
-        const output = getRelevantOutput(result);
-        return `## ${tool}\n${output}`;
-      }).join('\n\n');
-      const finalAnswer = Object.values(toolResults).map(getRelevantOutput).filter(Boolean).join('\n\n');
+
+      // This logic is simplified to focus on page-specific outputs
+      const finalAnswerContent = "Processing complete. Select a page to view its output.";
+      const usedToolsContent = `Tools used: ${toolsToUse.join(', ')}`;
+
       // Prepare output tabs
       const pageOutputs: Record<string, string> = {};
 
@@ -467,7 +453,6 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
         }
       };
 
-      // Create individual outputs for each selected page
       for (const page of selectedPagesFromAI) {
         const pageInstruction = usedGoal.toLowerCase();
         let pageOutputParts: string[] = [];
@@ -494,7 +479,7 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
               }
               pageOutputParts.push(videoOutput);
             }
-          } catch (err: any) { /* Gracefully ignore if no video, etc. */ }
+          } catch (err: any) { /* Gracefully ignore */ }
         } else if (isCodeInstruction) {
           actionTaken = true;
           try {
@@ -504,7 +489,7 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
             if (codeContent) {
               pageOutputParts.push(`### Code Result\n\`\`\`\n${codeContent}\n\`\`\``);
             }
-          } catch (err: any) { /* Gracefully ignore if no code */ }
+          } catch (err: any) { /* Gracefully ignore */ }
         } else if (isGraphInstruction) {
           actionTaken = true;
           try {
@@ -551,12 +536,12 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
             pageOutputs[page] = (pageOutputs[page] || '') + '\n\n### Errors\n' + pageErrors.join('\n');
           }
         } else {
-          pageOutputs[page] = "No specific action was requested. Please provide a clear instruction (e.g., 'summarize the video', 'convert the code to python').";
+          pageOutputs[page] = "No specific action was requested for this page.";
         }
       }
       // If no pages were processed, create a general output
       if (Object.keys(pageOutputs).length === 0) {
-        pageOutputs['General Analysis'] = finalAnswer;
+        pageOutputs['General Analysis'] = finalAnswerContent;
       }
       const tabs = [
         {
@@ -937,38 +922,38 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
               <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg z-30">
                 <h3 className="text-lg font-bold text-gray-800 mb-4">Select Space and Pages</h3>
                 <div className="mb-4">
-                    <label className="block text-gray-700 mb-2 text-left">Space</label>
-                    <select
-                        value={selectedSpace}
-                        onChange={(e) => {
-                            setSelectedSpace(e.target.value);
-                            setSelectedPages([]);
-                        }}
-                        className="w-full p-2 border border-white/30 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white/70 backdrop-blur-sm"
-                    >
-                        <option value="">Select a space...</option>
-                        {spaces.map(space => (
-                            <option key={space.key} value={space.key}>{space.name} ({space.key})</option>
-                        ))}
-                    </select>
-                  </div>
-                <div>
-                    <label className="block text-gray-700 mb-2 text-left">Pages</label>
-                    <select
-                        multiple
-                        value={selectedPages}
-                        onChange={(e) => setSelectedPages(Array.from(e.target.selectedOptions, option => option.value))}
-                        disabled={!selectedSpace}
-                        className="w-full p-2 border border-white/30 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white/70 backdrop-blur-sm"
-                        size={5}
-                    >
-                        {pages.map(page => (
-                            <option key={page} value={page}>{page}</option>
-                        ))}
-                    </select>
-                    <div className="text-xs text-gray-500 mt-1 text-left">Hold Ctrl/Cmd to select multiple pages.</div>
-                </div>
-                {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
+    <label className="block text-gray-700 mb-2 text-left">Space</label>
+    <select
+        value={selectedSpace}
+        onChange={(e) => {
+            setSelectedSpace(e.target.value);
+            setSelectedPages([]);
+        }}
+        className="w-full p-2 border border-white/30 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white/70 backdrop-blur-sm"
+    >
+        <option value="">Select a space...</option>
+        {spaces.map(space => (
+            <option key={space.key} value={space.key}>{space.name} ({space.key})</option>
+        ))}
+    </select>
+</div>
+<div>
+    <label className="block text-gray-700 mb-2 text-left">Pages</label>
+    <select
+        multiple
+        value={selectedPages}
+        onChange={(e) => setSelectedPages(Array.from(e.target.selectedOptions, option => option.value))}
+        disabled={!selectedSpace}
+        className="w-full p-2 border border-white/30 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white/70 backdrop-blur-sm"
+        size={5}
+    >
+        {pages.map(page => (
+            <option key={page} value={page}>{page}</option>
+        ))}
+    </select>
+    <div className="text-xs text-gray-500 mt-1 text-left">Hold Ctrl/Cmd to select multiple pages.</div>
+</div>
+{error && <p className="text-red-500 text-sm mt-2">{error}</p>}
               </div>
               {/* Chat Section - always present */}
               <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg mb-4">
