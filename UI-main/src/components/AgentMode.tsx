@@ -5,7 +5,7 @@ import type { AppMode } from '../App';
 import { apiService, analyzeGoal, videoSummarizer, createChart } from '../services/api';
 import ReactMarkdown from 'react-markdown';
 import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter';
-import materialDark from 'react-syntax-highlighter/dist/esm/styles/prism/material-dark';
+import { prism } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import jsx from 'react-syntax-highlighter/dist/esm/languages/prism/jsx';
 import typescript from 'react-syntax-highlighter/dist/esm/languages/prism/typescript';
 import javascript from 'react-syntax-highlighter/dist/esm/languages/prism/javascript';
@@ -177,14 +177,14 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
         <div key={`code-${lastIndex}`} className="my-2 rounded-lg overflow-hidden bg-gray-800 text-sm">
           <div className="bg-gray-700 text-white px-4 py-1 flex justify-between items-center">
             <span>{language}</span>
-            <button
+              <button 
               onClick={() => navigator.clipboard.writeText(code)}
               className="text-xs hover:bg-gray-600 p-1 rounded"
-            >
+              >
               Copy
-            </button>
+              </button>
           </div>
-          <SyntaxHighlighter language={language} style={materialDark} PreTag="div">
+          <SyntaxHighlighter language={language} style={prism} PreTag="div">
             {code}
           </SyntaxHighlighter>
         </div>
@@ -204,39 +204,39 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
   const renderInitialView = () => (
     <div className="max-w-4xl mx-auto">
       <div className="bg-white/60 backdrop-blur-xl rounded-xl p-6 border border-white/20 shadow-lg text-center mb-6">
-        <h3 className="text-xl font-bold text-gray-800 mb-4">Select Space and Pages</h3>
+                <h3 className="text-xl font-bold text-gray-800 mb-4">Select Space and Pages</h3>
         <div className="flex flex-col md:flex-row md:space-x-4 items-start">
           <div className="w-full md:w-1/2 mb-4 md:mb-0" style={{ zIndex: 30 }}>
-            <label className="block text-gray-700 mb-2 text-left">Space</label>
-            <Select
+                    <label className="block text-gray-700 mb-2 text-left">Space</label>
+                    <Select
               value={selectedSpace}
               onChange={(option) => {
                 setSelectedSpace(option);
-                setSelectedPages([]);
-              }}
+                        setSelectedPages([]);
+                      }}
               options={spaces}
               className="react-select-container"
               classNamePrefix="react-select"
-              placeholder="Select a space..."
-              isClearable
-            />
-          </div>
+                      placeholder="Select a space..."
+                      isClearable
+                    />
+                  </div>
           <div className="w-full md:w-1/2" style={{ zIndex: 20 }}>
-            <label className="block text-gray-700 mb-2 text-left">Pages</label>
-            <Select
-              isMulti
+                    <label className="block text-gray-700 mb-2 text-left">Pages</label>
+                    <Select
+                      isMulti
               value={selectedPages}
               onChange={(options) => setSelectedPages(options as any)}
               options={pages}
-              isDisabled={!selectedSpace}
+                      isDisabled={!selectedSpace}
               className="react-select-container"
               classNamePrefix="react-select"
               placeholder="Select pages..."
             />
-          </div>
-        </div>
-      </div>
-      <div className="bg-white/60 backdrop-blur-xl rounded-xl p-8 border border-white/20 shadow-lg text-center">
+                  </div>
+              </div>
+            </div>
+              <div className="bg-white/60 backdrop-blur-xl rounded-xl p-8 border border-white/20 shadow-lg text-center">
         <h3 className="text-2xl font-bold text-gray-800 mb-6">What do you want to achieve?</h3>
                 <div className="relative">
                   <textarea
@@ -246,13 +246,13 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
             className="w-full p-4 pr-16 border-2 border-orange-200/50 rounded-xl focus:ring-2 focus:ring-orange-500 resize-none"
                     rows={4}
                   />
-          <button
+                  <button
             onClick={() => handleGoalSubmit()}
             disabled={isProcessing || !goal.trim() || !selectedSpace || selectedPages.length === 0}
             className="absolute bottom-4 right-4 bg-orange-500 text-white p-3 rounded-xl hover:bg-orange-600 disabled:bg-gray-400"
           >
             {isProcessing ? <Loader2 className="animate-spin" /> : <Send />}
-          </button>
+                  </button>
         </div>
       </div>
       {error && <p className="text-red-500 text-sm mt-4">{error}</p>}
@@ -333,9 +333,9 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
             </div>
             <div className="whitespace-pre-wrap text-gray-800 max-h-[55vh] overflow-y-auto p-2 pretty-scrollbar">
               {formatContent(outputTabs.find(t => t.id === activeTab)?.content || '')}
+              </div>
             </div>
-          </div>
-        )}
+          )}
       </div>
     </div>
   );
@@ -377,12 +377,12 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
                   </div>
                   <div style={{ zIndex: 10 }}>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Pages</label>
-                     <Select
-                        isMulti
+                    <Select
+                      isMulti
                         value={selectedPages}
                         onChange={(options) => setSelectedPages(options as any)}
                         options={pages}
-                        isDisabled={!selectedSpace}
+                      isDisabled={!selectedSpace}
                         className="react-select-container"
                         classNamePrefix="react-select"
                         placeholder="Select pages..."
@@ -413,7 +413,7 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
           <div className="flex-1 flex flex-col min-h-0">
              <button onClick={() => setSidebarOpen(!sidebarOpen)} className="absolute top-2 left-2 z-20 bg-white/50 p-2 rounded-full hover:bg-white/80 transition-all">
                 <PanelLeftClose className="w-5 h-5 text-gray-700" />
-            </button>
+              </button>
             <div className="p-6 overflow-y-auto flex-1">
               {isProcessing || outputTabs.length > 0 ? renderResultsView() : renderInitialView()}
             </div>
