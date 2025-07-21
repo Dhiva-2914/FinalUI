@@ -1262,7 +1262,7 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
                                     </button>
                                 ))}
                                   </div>
-                              <div className="whitespace-pre-wrap text-gray-700">
+                              <div className="whitespace-pre-wrap text-gray-700 max-h-[60vh] overflow-y-auto">
                                 {(() => {
                                   const pageOutputs = outputTabs.find(tab => tab.id === 'final-answer')?.pageOutputs || {};
                                   const content = pageOutputs[selectedFinalPage || Object.keys(pageOutputs)[0]] || 'No output for this page.';
