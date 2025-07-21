@@ -454,27 +454,33 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
       const finalAnswer = Object.values(toolResults).map(getRelevantOutput).filter(Boolean).join('\n\n');
       // Prepare output tabs
       const pageOutputs: Record<string, string> = {};
-      
+
+      const createConciseInstruction = (baseInstruction: string, type: 'code' | 'summary' | 'impact') => {
+        const codeSuffix = " IMPORTANT: Your response must contain only the raw, complete code for the final result. Do not include any explanatory text, comments about the changes, analysis of the code, or markdown formatting like ```. Just the code.";
+        const summarySuffix = " IMPORTANT: Provide a direct and concise summary. Do not include meta-analysis about the content's structure, introductions, or suggestions for other actions.";
+        const impactSuffix = " IMPORTANT: Provide a direct and concise impact analysis. Do not ask for more information or explain what impact analysis is.";
+        switch (type) {
+            case 'code': return `${baseInstruction}.${codeSuffix}`;
+            case 'summary': return `${baseInstruction}.${summarySuffix}`;
+            case 'impact': return `${baseInstruction}.${impactSuffix}`;
+            default: return baseInstruction;
+        }
+      };
+
       // Create individual outputs for each selected page
       for (const page of selectedPagesFromAI) {
-        const pageInstruction = usedGoal.toLowerCase(); // Use the same instruction for each page for now
+        const pageInstruction = usedGoal.toLowerCase();
         let pageOutputParts: string[] = [];
         let pageErrors: string[] = [];
         let actionTaken = false;
 
-        // --- Tool Execution based on Instruction ---
+        const isCodeInstruction = pageInstruction.includes('code') || pageInstruction.includes('convert') || pageInstruction.includes('refactor') || pageInstruction.includes('dead code') || pageInstruction.includes('logging');
+        const isVideoSummaryInstruction = pageInstruction.includes('summarize') && pageInstruction.includes('video');
+        const isTextSummaryInstruction = pageInstruction.includes('summarize') && !pageInstruction.includes('video');
+        const isGraphInstruction = pageInstruction.includes('create') && (pageInstruction.includes('graph') || pageInstruction.includes('chart'));
+        const isImpactInstruction = pageInstruction.includes('impact');
 
-        // 1. Summarize Text (AIPoweredSearch)
-        if (pageInstruction.includes('summarize') && (pageInstruction.includes('text') || pageInstruction.includes('para') || pageInstruction.includes('document'))) {
-          actionTaken = true;
-          try {
-            const res = await apiService.search({ space_key: selectedSpace, page_titles: [page], query: usedGoal });
-            if (res.response) pageOutputParts.push(`### Text Summary\n${res.response}`);
-          } catch (err: any) { pageErrors.push(`Text Summary Failed: ${err.message}`); }
-        }
-
-        // 2. Summarize Video
-        if (pageInstruction.includes('summarize') && pageInstruction.includes('video')) {
+        if (isVideoSummaryInstruction) {
           actionTaken = true;
           try {
             const videoResult = await apiService.videoSummarizer({ space_key: selectedSpace, page_title: page });
@@ -489,62 +495,54 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
               pageOutputParts.push(videoOutput);
             }
           } catch (err: any) { /* Gracefully ignore if no video, etc. */ }
-        }
-
-        // 3. Convert Code (CodeAssistant)
-        if (pageInstruction.includes('convert') && pageInstruction.includes('code')) {
+        } else if (isCodeInstruction) {
           actionTaken = true;
           try {
-            const codeResult = await apiService.codeAssistant({ space_key: selectedSpace, page_title: page, instruction: usedGoal });
-            if (codeResult.converted_code) {
-              pageOutputParts.push(`### Code Conversion\n\`\`\`${codeResult.target_language || ''}\n${codeResult.converted_code}\n\`\`\``);
+            const conciseInstruction = createConciseInstruction(usedGoal, 'code');
+            const codeResult = await apiService.codeAssistant({ space_key: selectedSpace, page_title: page, instruction: conciseInstruction });
+            let codeContent = codeResult.response || codeResult.converted_code;
+            if (codeContent) {
+              pageOutputParts.push(`### Code Result\n\`\`\`\n${codeContent}\n\`\`\``);
             }
           } catch (err: any) { /* Gracefully ignore if no code */ }
-        }
-        
-        // 4. Create Graph (ImageInsights)
-        if (pageInstruction.includes('create') && (pageInstruction.includes('graph') || pageInstruction.includes('chart'))) {
+        } else if (isGraphInstruction) {
           actionTaken = true;
           try {
             const images = await apiService.getImages(selectedSpace, page);
             if (images && images.images && images.images.length > 0) {
-              const imgUrl = images.images[0]; // Process first image
+              const imgUrl = images.images[0];
               const chartResult = await apiService.createChart({
-                space_key: selectedSpace,
-                page_title: page,
-                image_url: imgUrl,
-                chart_type: 'bar', // Can be enhanced to parse from instruction
-                filename: 'chart',
-                format: 'png',
+                space_key: selectedSpace, page_title: page, image_url: imgUrl,
+                chart_type: 'bar', filename: 'chart', format: 'png',
               });
               if (chartResult && chartResult.chart_data) {
-                let chartOutput = '### Generated Graph\nChart data generated successfully.';
-                // If chart_url is part of the response, it would be added here
-                pageOutputParts.push(chartOutput);
+                pageOutputParts.push('### Generated Graph\nChart data generated successfully.');
               }
             } else {
                pageOutputParts.push('### Generated Graph\nNo images found on the page to create a graph.');
             }
           } catch (err: any) { pageErrors.push(`Graph Creation Failed: ${err.message}`); }
-        }
-
-        // 5. Impact Analysis
-        if (pageInstruction.includes('impact') && selectedPagesFromAI.length >= 2) {
+        } else if (isImpactInstruction && selectedPagesFromAI.length >= 2) {
             actionTaken = true;
             try {
+                const conciseQuestion = createConciseInstruction(usedGoal, 'impact');
                 const impactResult = await apiService.impactAnalyzer({
-                    space_key: selectedSpace,
-                    old_page_title: selectedPagesFromAI[0], // simplified assumption
-                    new_page_title: selectedPagesFromAI[1], // simplified assumption
-                    question: usedGoal,
+                    space_key: selectedSpace, old_page_title: selectedPagesFromAI[0],
+                    new_page_title: selectedPagesFromAI[1], question: conciseQuestion,
                 });
                 if (impactResult.impact_analysis) {
                     pageOutputParts.push(`### Impact Analysis\n${impactResult.impact_analysis}`);
                 }
             } catch (err: any) { pageErrors.push(`Impact Analysis Failed: ${err.message}`); }
+        } else if (isTextSummaryInstruction) {
+          actionTaken = true;
+          try {
+            const conciseQuery = createConciseInstruction(usedGoal, 'summary');
+            const res = await apiService.search({ space_key: selectedSpace, page_titles: [page], query: conciseQuery });
+            if (res.response) pageOutputParts.push(`### Summary\n${res.response}`);
+          } catch (err: any) { pageErrors.push(`Text Summary Failed: ${err.message}`); }
         }
         
-        // Final Output Assembly
         if (actionTaken) {
           if (pageOutputParts.length > 0) {
             pageOutputs[page] = pageOutputParts.join('\n\n---\n\n');
@@ -940,36 +938,35 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
                 <h3 className="text-lg font-bold text-gray-800 mb-4">Select Space and Pages</h3>
                 <div className="mb-4">
                     <label className="block text-gray-700 mb-2 text-left">Space</label>
-                    <Select
-                      classNamePrefix="react-select"
-                      options={spaces.map(space => ({ value: space.key, label: `${space.name} (${space.key})` }))}
-                      value={spaces.find(s => s.key === selectedSpace) ? { value: selectedSpace, label: `${spaces.find(s => s.key === selectedSpace)?.name} (${selectedSpace})` } : null}
-                      onChange={option => {
-                        setSelectedSpace(option ? option.value : '');
-                        setSelectedPages([]);
-                      }}
-                      placeholder="Select a space..."
-                      isClearable
-                      menuPortalTarget={document.body}
-                      styles={{ menuPortal: base => ({ ...base, zIndex: 9999 }) }}
-                    />
+                    <select
+                        value={selectedSpace}
+                        onChange={(e) => {
+                            setSelectedSpace(e.target.value);
+                            setSelectedPages([]);
+                        }}
+                        className="w-full p-2 border border-white/30 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white/70 backdrop-blur-sm"
+                    >
+                        <option value="">Select a space...</option>
+                        {spaces.map(space => (
+                            <option key={space.key} value={space.key}>{space.name} ({space.key})</option>
+                        ))}
+                    </select>
                   </div>
                 <div>
                     <label className="block text-gray-700 mb-2 text-left">Pages</label>
-                    <Select
-                      classNamePrefix="react-select"
-                      isMulti
-                      isSearchable
-                      isDisabled={!selectedSpace}
-                      options={pages.map(page => ({ value: page, label: page }))}
-                      value={selectedPages.map(page => ({ value: page, label: page }))}
-                      onChange={options => setSelectedPages(options ? options.map(opt => opt.value) : [])}
-                      placeholder={selectedSpace ? "Type or select pages..." : "Select a space first"}
-                      closeMenuOnSelect={false}
-                      menuPortalTarget={document.body}
-                      styles={{ menuPortal: base => ({ ...base, zIndex: 9999 }) }}
-                    />
-                    <div className="text-xs text-gray-500 mt-1 text-left">Type to search and select multiple pages.</div>
+                    <select
+                        multiple
+                        value={selectedPages}
+                        onChange={(e) => setSelectedPages(Array.from(e.target.selectedOptions, option => option.value))}
+                        disabled={!selectedSpace}
+                        className="w-full p-2 border border-white/30 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white/70 backdrop-blur-sm"
+                        size={5}
+                    >
+                        {pages.map(page => (
+                            <option key={page} value={page}>{page}</option>
+                        ))}
+                    </select>
+                    <div className="text-xs text-gray-500 mt-1 text-left">Hold Ctrl/Cmd to select multiple pages.</div>
                 </div>
                 {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
               </div>
@@ -1021,32 +1018,35 @@ ${outputTabs.find(tab => tab.id === 'used-tools')?.content || ''}
                     <div className="flex flex-col md:flex-row md:space-x-4 items-center justify-center mb-4">
                       <div className="mb-4 md:mb-0 w-full md:w-1/2">
                     <label className="block text-gray-700 mb-2 text-left">Space</label>
-                    <Select
-                      classNamePrefix="react-select"
-                      options={spaces.map(space => ({ value: space.key, label: `${space.name} (${space.key})` }))}
-                      value={spaces.find(s => s.key === selectedSpace) ? { value: selectedSpace, label: `${spaces.find(s => s.key === selectedSpace)?.name} (${selectedSpace})` } : null}
-                      onChange={option => {
-                        setSelectedSpace(option ? option.value : '');
-                        setSelectedPages([]);
-                      }}
-                      placeholder="Select a space..."
-                      isClearable
-                    />
+                    <select
+                        value={selectedSpace}
+                        onChange={(e) => {
+                            setSelectedSpace(e.target.value);
+                            setSelectedPages([]);
+                        }}
+                        className="w-full p-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    >
+                        <option value="">Select a space...</option>
+                        {spaces.map(space => (
+                            <option key={space.key} value={space.key}>{space.name} ({space.key})</option>
+                        ))}
+                    </select>
                   </div>
                       <div className="w-full md:w-1/2">
                     <label className="block text-gray-700 mb-2 text-left">Pages</label>
-                    <Select
-                      classNamePrefix="react-select"
-                      isMulti
-                      isSearchable
-                      isDisabled={!selectedSpace}
-                      options={pages.map(page => ({ value: page, label: page }))}
-                      value={selectedPages.map(page => ({ value: page, label: page }))}
-                      onChange={options => setSelectedPages(options ? options.map(opt => opt.value) : [])}
-                      placeholder={selectedSpace ? "Type or select pages..." : "Select a space first"}
-                      closeMenuOnSelect={false}
-                    />
-                    <div className="text-xs text-gray-500 mt-1 text-left">Type to search and select multiple pages.</div>
+                    <select
+                        multiple
+                        value={selectedPages}
+                        onChange={(e) => setSelectedPages(Array.from(e.target.selectedOptions, option => option.value))}
+                        disabled={!selectedSpace}
+                        className="w-full p-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                        size={5}
+                    >
+                        {pages.map(page => (
+                            <option key={page} value={page}>{page}</option>
+                        ))}
+                    </select>
+                    <div className="text-xs text-gray-500 mt-1 text-left">Hold Ctrl/Cmd to select multiple pages.</div>
                       </div>
                   </div>
                   {error && <p className="text-red-500 text-sm mt-2">{error}</p>}

@@ -51,6 +51,7 @@ export interface CodeResponse {
   modified_code?: string;
   converted_code?: string;
   target_language?: string;
+  response?: string;
 }
 
 export interface ImpactResponse {
