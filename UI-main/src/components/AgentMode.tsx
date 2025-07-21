@@ -120,7 +120,8 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
       setActiveTab('final-answer');
       setSelectedFinalPage(pageTitles[0] || null);
     } catch (err: any) {
-      setError(err.detail || 'An unexpected error occurred.');
+      console.error('AgentMode error:', err);
+      setError((err && (err.detail || err.message)) || 'An unexpected error occurred.');
     } finally {
       setIsProcessing(false);
     }
