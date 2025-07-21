@@ -4,21 +4,12 @@ import { Zap, X, Send, Brain, Loader2, MessageSquare, FileText, PanelLeftClose }
 import type { AppMode } from '../App';
 import { apiService, analyzeGoal, videoSummarizer, createChart } from '../services/api';
 import ReactMarkdown from 'react-markdown';
-import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { prism } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import jsx from 'react-syntax-highlighter/dist/esm/languages/prism/jsx';
-import typescript from 'react-syntax-highlighter/dist/esm/languages/prism/typescript';
-import javascript from 'react-syntax-highlighter/dist/esm/languages/prism/javascript';
-import python from 'react-syntax-highlighter/dist/esm/languages/prism/python';
-import bash from 'react-syntax-highlighter/dist/esm/languages/prism/bash';
-import json from 'react-syntax-highlighter/dist/esm/languages/prism/json';
+import CodeMirror from '@uiw/react-codemirror';
+import { javascript } from '@codemirror/lang-javascript';
+import { python } from '@codemirror/lang-python';
+import { json } from '@codemirror/lang-json';
+import { okaidia } from '@uiw/codemirror-theme-okaidia';
 
-SyntaxHighlighter.registerLanguage('jsx', jsx);
-SyntaxHighlighter.registerLanguage('typescript', typescript);
-SyntaxHighlighter.registerLanguage('javascript', javascript);
-SyntaxHighlighter.registerLanguage('python', python);
-SyntaxHighlighter.registerLanguage('bash', bash);
-SyntaxHighlighter.registerLanguage('json', json);
 
 interface AgentModeProps {
   onClose: () => void;
@@ -173,20 +164,38 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
       }
       const language = match[1] || 'bash';
       const code = match[2];
+      
+      let langExtension;
+      switch (language.toLowerCase()) {
+        case 'javascript':
+        case 'js':
+        case 'jsx':
+          langExtension = [javascript({ jsx: true })];
+          break;
+        case 'python':
+          langExtension = [python()];
+          break;
+        case 'json':
+            langExtension = [json()];
+            break;
+        default:
+          langExtension = [];
+      }
+
       parts.push(
-        <div key={`code-${lastIndex}`} className="my-2 rounded-lg overflow-hidden bg-gray-800 text-sm">
-          <div className="bg-gray-700 text-white px-4 py-1 flex justify-between items-center">
-            <span>{language}</span>
-              <button 
-              onClick={() => navigator.clipboard.writeText(code)}
-              className="text-xs hover:bg-gray-600 p-1 rounded"
-              >
-              Copy
-              </button>
-          </div>
-          <SyntaxHighlighter language={language} style={prism} PreTag="div">
-            {code}
-          </SyntaxHighlighter>
+        <div key={`code-${lastIndex}`} className="my-2 rounded-lg overflow-hidden text-sm">
+           <CodeMirror
+            value={code}
+            theme={okaidia}
+            extensions={langExtension}
+            editable={false}
+            basicSetup={{
+              foldGutter: false,
+              dropCursor: false,
+              allowMultipleSelections: false,
+              indentOnInput: false,
+            }}
+          />
         </div>
       );
       lastIndex = codeBlockRegex.lastIndex;
