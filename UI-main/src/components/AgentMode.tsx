@@ -4,8 +4,21 @@ import { Zap, X, Send, Brain, Loader2, MessageSquare, FileText, PanelLeftClose }
 import type { AppMode } from '../App';
 import { apiService, analyzeGoal, videoSummarizer, createChart } from '../services/api';
 import ReactMarkdown from 'react-markdown';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { materialDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import jsx from 'react-syntax-highlighter/dist/esm/languages/prism/jsx';
+import typescript from 'react-syntax-highlighter/dist/esm/languages/prism/typescript';
+import javascript from 'react-syntax-highlighter/dist/esm/languages/prism/javascript';
+import python from 'react-syntax-highlighter/dist/esm/languages/prism/python';
+import bash from 'react-syntax-highlighter/dist/esm/languages/prism/bash';
+import json from 'react-syntax-highlighter/dist/esm/languages/prism/json';
+
+SyntaxHighlighter.registerLanguage('jsx', jsx);
+SyntaxHighlighter.registerLanguage('typescript', typescript);
+SyntaxHighlighter.registerLanguage('javascript', javascript);
+SyntaxHighlighter.registerLanguage('python', python);
+SyntaxHighlighter.registerLanguage('bash', bash);
+SyntaxHighlighter.registerLanguage('json', json);
 
 interface AgentModeProps {
   onClose: () => void;
@@ -171,7 +184,7 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
               Copy
             </button>
           </div>
-          <SyntaxHighlighter language={language} style={materialDark}>
+          <SyntaxHighlighter language={language} style={materialDark} PreTag="div">
             {code}
           </SyntaxHighlighter>
         </div>
