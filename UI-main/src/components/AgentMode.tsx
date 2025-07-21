@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Zap, X, Send, Brain, CheckCircle, Loader2, MessageSquare, PanelLeftClose, FileText } from 'lucide-react';
+import Select from 'react-select';
+import { Zap, X, Send, Brain, Loader2, MessageSquare, FileText } from 'lucide-react';
 import type { AppMode } from '../App';
 import { apiService, analyzeGoal } from '../services/api';
 
@@ -29,10 +30,10 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
   const [planSteps, setPlanSteps] = useState<PlanStep[]>([]);
   const [activeTab, setActiveTab] = useState('final-answer');
   const [outputTabs, setOutputTabs] = useState<OutputTab[]>([]);
-  const [spaces, setSpaces] = useState<{ key: string, name: string }[]>([]);
-  const [pages, setPages] = useState<string[]>([]);
-  const [selectedSpace, setSelectedSpace] = useState('');
-  const [selectedPages, setSelectedPages] = useState<string[]>([]);
+  const [spaces, setSpaces] = useState<{ value: string, label: string }[]>([]);
+  const [pages, setPages] = useState<{ value: string, label: string }[]>([]);
+  const [selectedSpace, setSelectedSpace] = useState<{ value: string, label: string } | null>(null);
+  const [selectedPages, setSelectedPages] = useState<{ value: string, label: string }[]>([]);
   const [error, setError] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [chatInput, setChatInput] = useState('');
@@ -46,7 +47,7 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
     const loadSpaces = async () => {
       try {
         const spaceData = await apiService.getSpaces();
-        setSpaces(spaceData.spaces);
+        setSpaces(spaceData.spaces.map(s => ({ value: s.key, label: s.name })));
       } catch (err) {
         setError('Failed to load spaces.');
       }
@@ -58,8 +59,8 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
     if (selectedSpace) {
       const loadPages = async () => {
         try {
-          const pageData = await apiService.getPages(selectedSpace);
-          setPages(pageData.pages);
+          const pageData = await apiService.getPages(selectedSpace.value);
+          setPages(pageData.pages.map(p => ({ value: p, label: p })));
         } catch (err) {
           setError('Failed to load pages for the selected space.');
         }
@@ -70,45 +71,54 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
     }
   }, [selectedSpace]);
 
+  // Helper: Split instructions by newlines or periods
+  const splitInstructions = (input: string) => {
+    return input
+      .split(/\n|\.|\r/)
+      .map(instr => instr.trim())
+      .filter(instr => instr.length > 0);
+  };
+
+  // Main handler for chat and goal submit
   const handleGoalSubmit = async (goalOverride?: string) => {
     const usedGoal = goalOverride || goal;
     if (!usedGoal.trim() || !selectedSpace || selectedPages.length === 0) {
       setError('Please provide a goal, select a space, and at least one page.');
       return;
     }
-
     setIsProcessing(true);
     setError('');
     setPlanSteps([{ id: 1, title: 'Processing...', status: 'running' }]);
     setOutputTabs([]);
-    
     try {
-      const analysis = await analyzeGoal(usedGoal, selectedPages);
+      const pageTitles = selectedPages.map(p => p.value);
+      const instructions = splitInstructions(usedGoal);
+      const analysis = await analyzeGoal(usedGoal, pageTitles);
       const orchestrationReasoning = analysis.reasoning || 'Analysis complete.';
-      
       const pageOutputs: Record<string, string> = {};
-      
-      for (const pageTitle of selectedPages) {
+      for (const pageTitle of pageTitles) {
+        let outputParts: string[] = [];
+        for (const instr of instructions) {
           try {
-              const result = await apiService.search({
-                  space_key: selectedSpace,
-                  page_titles: [pageTitle],
-                  query: usedGoal,
-              });
-              pageOutputs[pageTitle] = result.response || `No output for ${pageTitle}.`;
-          } catch(e: any) {
-              pageOutputs[pageTitle] = `Failed to process ${pageTitle}: ${e.message}`;
+            const result = await apiService.search({
+              space_key: selectedSpace.value,
+              page_titles: [pageTitle],
+              query: instr,
+            });
+            outputParts.push(`**Instruction:** ${instr}\n${result.response || 'No output.'}`);
+          } catch (e: any) {
+            outputParts.push(`**Instruction:** ${instr}\nFailed: ${e.message}`);
           }
+        }
+        pageOutputs[pageTitle] = outputParts.join('\n\n---\n\n');
       }
-
       setPlanSteps([{ id: 1, title: 'Completed', status: 'completed' }]);
       setOutputTabs([
         { id: 'final-answer', label: 'Final Answer', icon: FileText, content: '', pageOutputs },
         { id: 'reasoning', label: 'Reasoning', icon: Brain, content: orchestrationReasoning },
       ]);
       setActiveTab('final-answer');
-      setSelectedFinalPage(selectedPages[0] || null);
-
+      setSelectedFinalPage(pageTitles[0] || null);
     } catch (err: any) {
       setError(err.detail || 'An unexpected error occurred.');
     } finally {
@@ -126,31 +136,35 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
       <div className="bg-white/60 backdrop-blur-xl rounded-xl p-6 border border-white/20 shadow-lg text-center mb-6">
         <h3 className="text-xl font-bold text-gray-800 mb-4">Select Space and Pages</h3>
         <div className="flex flex-col md:flex-row md:space-x-4 items-start">
-          <div className="w-full md:w-1/2 mb-4 md:mb-0">
+          <div className="w-full md:w-1/2 mb-4 md:mb-0" style={{ position: 'relative', zIndex: 20 }}>
             <label className="block text-gray-700 mb-2 text-left">Space</label>
             <select
-              value={selectedSpace}
-              onChange={(e) => {
-                setSelectedSpace(e.target.value);
+              value={selectedSpace ? selectedSpace.value : ''}
+              onChange={e => {
+                const found = spaces.find(s => s.value === e.target.value) || null;
+                setSelectedSpace(found);
                 setSelectedPages([]);
               }}
               className="w-full p-2 border rounded-xl"
             >
               <option value="">Select a space...</option>
-              {spaces.map(s => <option key={s.key} value={s.key}>{s.name}</option>)}
+              {spaces.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
           </div>
-          <div className="w-full md:w-1/2">
+          <div className="w-full md:w-1/2" style={{ position: 'relative', zIndex: 20 }}>
             <label className="block text-gray-700 mb-2 text-left">Pages</label>
             <select
               multiple
-              value={selectedPages}
-              onChange={(e) => setSelectedPages(Array.from(e.target.selectedOptions, option => option.value))}
+              value={selectedPages.map(p => p.value)}
+              onChange={e => {
+                const values = Array.from(e.target.selectedOptions, option => option.value);
+                setSelectedPages(pages.filter(p => values.includes(p.value)));
+              }}
               disabled={!selectedSpace}
               className="w-full p-2 border rounded-xl"
               size={5}
             >
-              {pages.map(p => <option key={p} value={p}>{p}</option>)}
+              {pages.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
             </select>
           </div>
         </div>
@@ -246,28 +260,32 @@ const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Space</label>
                     <select
-                      value={selectedSpace}
-                      onChange={(e) => {
-                        setSelectedSpace(e.target.value);
+                      value={selectedSpace ? selectedSpace.value : ''}
+                      onChange={e => {
+                        const found = spaces.find(s => s.value === e.target.value) || null;
+                        setSelectedSpace(found);
                         setSelectedPages([]);
                       }}
                       className="w-full p-2 border rounded-xl"
                     >
                       <option value="">Select a space...</option>
-                      {spaces.map(s => <option key={s.key} value={s.key}>{s.name}</option>)}
+                      {spaces.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                     </select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Pages</label>
                     <select
                       multiple
-                      value={selectedPages}
-                      onChange={(e) => setSelectedPages(Array.from(e.target.selectedOptions, option => option.value))}
+                      value={selectedPages.map(p => p.value)}
+                      onChange={e => {
+                        const values = Array.from(e.target.selectedOptions, option => option.value);
+                        setSelectedPages(pages.filter(p => values.includes(p.value)));
+                      }}
                       disabled={!selectedSpace}
                       className="w-full p-2 border rounded-xl"
                       size={5}
                     >
-                      {pages.map(p => <option key={p} value={p}>{p}</option>)}
+                      {pages.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
                     </select>
                   </div>
                 </div>
