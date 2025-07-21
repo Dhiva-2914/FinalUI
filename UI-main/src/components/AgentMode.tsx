@@ -5,7 +5,7 @@ import type { AppMode } from '../App';
 import { apiService, analyzeGoal, videoSummarizer, createChart } from '../services/api';
 import ReactMarkdown from 'react-markdown';
 import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { materialDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import materialDark from 'react-syntax-highlighter/dist/esm/styles/prism/material-dark';
 import jsx from 'react-syntax-highlighter/dist/esm/languages/prism/jsx';
 import typescript from 'react-syntax-highlighter/dist/esm/languages/prism/typescript';
 import javascript from 'react-syntax-highlighter/dist/esm/languages/prism/javascript';
