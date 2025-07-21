@@ -275,9 +275,9 @@ ${qaResults.map(qa => `**Q:** ${qa.question}\n**A:** ${qa.answer}`).join('\n\n')
               >
                 Switch to Agent Mode
               </button>
-              <button onClick={onClose} className="text-white hover:bg-white/10 rounded-full p-2 backdrop-blur-sm">
-                <X className="w-6 h-6" />
-              </button>
+            <button onClick={onClose} className="text-white hover:bg-white/10 rounded-full p-2 backdrop-blur-sm">
+              <X className="w-6 h-6" />
+            </button>
             </div>
           </div>
           

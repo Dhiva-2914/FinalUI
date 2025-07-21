@@ -151,12 +151,12 @@ const CodeAssistant: React.FC<CodeAssistantProps> = ({ onClose, onFeatureSelect,
 
       // If modification instruction or target language is selected, process with API
       if (hasModificationInstruction || hasTargetLanguage) {
-        const result = await apiService.codeAssistant({
-          space_key: selectedSpace,
-          page_title: selectedPage,
-          instruction: instruction,
-          target_language: targetLanguage || undefined
-        });
+      const result = await apiService.codeAssistant({
+        space_key: selectedSpace,
+        page_title: selectedPage,
+        instruction: instruction,
+        target_language: targetLanguage || undefined
+      });
 
         // Show converted code if target language is selected
         if (hasTargetLanguage && result.converted_code) {
@@ -167,7 +167,7 @@ const CodeAssistant: React.FC<CodeAssistantProps> = ({ onClose, onFeatureSelect,
         // Show modified code if modification instruction is used
         if (hasModificationInstruction && result.modified_code) {
           setModificationOutput(result.modified_code);
-        } else {
+      } else {
           setModificationOutput('');
         }
       }
@@ -267,9 +267,9 @@ const CodeAssistant: React.FC<CodeAssistantProps> = ({ onClose, onFeatureSelect,
               >
                 Switch to Agent Mode
               </button>
-              <button onClick={onClose} className="text-white hover:bg-white/10 rounded-full p-2 backdrop-blur-sm">
-                <X className="w-6 h-6" />
-              </button>
+            <button onClick={onClose} className="text-white hover:bg-white/10 rounded-full p-2 backdrop-blur-sm">
+              <X className="w-6 h-6" />
+            </button>
             </div>
           </div>
           

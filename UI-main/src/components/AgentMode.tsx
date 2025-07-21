@@ -24,6 +24,30 @@ interface OutputTab {
   pageOutputs?: Record<string, string>;
 }
 
+// Helper functions for intent and page extraction
+function extractPageNames(sentence: string, allPages: string[]): string[] {
+  // Try to match any page name in the sentence
+  return allPages.filter(page => sentence.toLowerCase().includes(page.toLowerCase()));
+}
+function isSummarizeText(sentence: string) {
+  return /summari(s|z)e.*(text|para|document)/i.test(sentence);
+}
+function isSummarizeVideo(sentence: string) {
+  return /summari(s|z)e.*video/i.test(sentence);
+}
+function isConvertCode(sentence: string) {
+  return /convert.*code.*to/i.test(sentence);
+}
+function isGraph(sentence: string) {
+  return /graph|chart|visualize/i.test(sentence);
+}
+function isImpact(sentence: string) {
+  return /impact.*analy(s|z)e/i.test(sentence);
+}
+function isTestSupport(sentence: string) {
+  return /test.*support|test.*strategy/i.test(sentence);
+}
+
 const AgentMode: React.FC<AgentModeProps> = ({ onClose, onModeSelect }) => {
   const [goal, setGoal] = useState('');
   const [isPlanning, setIsPlanning] = useState(false);
