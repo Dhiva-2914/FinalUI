@@ -284,7 +284,7 @@ class ApiService {
   }
 }
 
-export const apiService = new ApiService();
+export const apiService = new ApiService(); 
 
 export async function analyzeGoal(goal: string, availablePages: string[]) {
   const res = await fetch(`${API_BASE_URL}/analyze-goal`, {
